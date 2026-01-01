@@ -1,93 +1,77 @@
 (function () {
     'use strict';
 
-    function AnimePro(object) {
+    function AnimePlugin() {
         var network = new Lampa.Reguest();
-        var scroll  = new Lampa.Scroll({mask:true, over:true});
-        var items   = [];
+        var scroll  = new Lampa.Scroll({mask: true, over: true});
         var html    = $('<div></div>');
         var body    = $('<div class="category-full"></div>');
-        var active  = 0;
-        var page    = 1;
+        var active_tab = 0;
 
         var tabs = [
-            { title: 'Топ аниме', params: 'order=ranked&limit=40' },
-            { title: 'Онгоинги', params: 'status=ongoing&order=popularity&limit=40' },
-            { title: 'Сейчас смотрят', params: 'season=2024_2025&order=popularity&limit=40' },
-            { title: 'Все аниме', params: 'order=popularity&limit=40' },
-            { title: '18+', params: 'rating=rx,r_plus&censored=false&order=popularity&limit=40' }
+            {title: 'Топ', params: 'order=ranked'},
+            {title: 'Онгоинги', params: 'status=ongoing'},
+            {title: 'Новинки', params: 'season=2025_2026&order=popularity'},
+            {title: 'Все', params: 'order=popularity'},
+            {title: '18+', params: 'rating=rx,r_plus&censored=false'}
         ];
 
         this.create = function () {
             var _this = this;
-
-            // Создаем табы
-            var bar   = $('<div class="layer--tabs"></div>');
-            var list  = $('<div class="layer--tabs_list"></div>');
-
+            var bar  = $('<div class="layer--tabs"><div class="layer--tabs_list"></div></div>');
+            
             tabs.forEach(function (tab, i) {
-                var item = $('<div class="layer--tabs_item selector '+(active == i ? 'active' : '')+'" data-index="'+i+'">'+tab.title+'</div>');
-                item.on('hover:enter', function () {
-                    if (active == i) return;
-                    active = i;
-                    page = 1;
-                    $('.layer--tabs_item', list).removeClass('active');
+                var t = $('<div class="layer--tabs_item selector">' + tab.title + '</div>');
+                if (i === active_tab) t.addClass('active');
+                t.on('hover:enter', function () {
+                    if (active_tab === i) return;
+                    active_tab = i;
+                    bar.find('.layer--tabs_item').removeClass('active');
                     $(this).addClass('active');
                     _this.load();
                 });
-                list.append(item);
+                bar.find('.layer--tabs_list').append(t);
             });
 
-            html.append(bar);
-            html.append(scroll.render());
+            html.append(bar).append(scroll.render());
             scroll.append(body);
-
             this.load();
-
             return this.render();
         };
 
-        this.load = function (append) {
+        this.load = function () {
             var _this = this;
-            if(!append) {
-                body.empty();
-                scroll.reset();
-                Lampa.Loading.start();
-            }
+            Lampa.Loading.start();
+            body.empty();
 
-            var query = tabs[active].params + '&page=' + page + '&censored=false'; 
-            var url = Lampa.Utils.proxy('https://shikimori.one/api/animes?' + query);
-
-            network.silent(url, function (json) {
+            // Пробуем использовать проксирование через разные зеркала, если первое не сработает
+            var url = 'https://shikimori.one/api/animes?limit=40&' + tabs[active_tab].params;
+            
+            network.silent(Lampa.Utils.proxy(url), function (json) {
                 Lampa.Loading.stop();
-                if(json && json.length){
+                if (json && json.length) {
                     _this.build(json);
-                } else if(!append) {
-                    body.append('<div class="empty">Ничего не найдено</div>');
+                } else {
+                    body.append('<div class="empty">Данные от сервера пусты</div>');
                 }
-            }, function(){
+            }, function () {
                 Lampa.Loading.stop();
-                if(!append) body.append('<div class="empty">Ошибка загрузки</div>');
+                body.append('<div class="empty">Ошибка сети. Попробуйте включить "Прокси" в настройках Lampa.</div>');
             });
         };
 
-        this.build = function (data) {
+        this.build = function(json) {
             var _this = this;
-            data.forEach(function(item){
-                var img = item.image ? (item.image.original.indexOf('http') == -1 ? 'https://shikimori.one' + item.image.original : item.image.original) : '';
-                
+            json.forEach(function (item) {
                 var card = new Lampa.Card({
                     id: item.id,
                     title: item.russian || item.name,
-                    img: img,
-                    year: item.aired_on ? item.aired_on.split('-')[0] : '????'
-                }, {
-                    card_source: 'shikimori'
-                });
+                    img: 'https://shikimori.one' + item.image.original,
+                    year: item.aired_on ? item.aired_on.split('-')[0] : ''
+                }, { card_source: 'shikimori' });
 
-                card.on('enter', function(){
+                card.on('enter', function () {
                     Lampa.Activity.push({
-                        url: '',
                         component: 'full',
                         id: item.id,
                         method: 'anime',
@@ -99,183 +83,25 @@
                 card.create();
                 body.append(card.render());
             });
-
             Lampa.Controller.enable('content');
         };
 
-        this.render = function () {
-            return html;
-        };
-
-        this.destroy = function () {
-            network.clear();
-            scroll.destroy();
-            html.remove();
-        };
+        this.render  = function () { return html; };
+        this.destroy = function () { network.clear(); scroll.destroy(); html.remove(); };
     }
 
-    function startPlugin() {
-        window.plugin_anime_pro_ready = true;
-        Lampa.Component.add('anime_pro', AnimePro);
-        
-        var menu_item = $('<div class="menu__item selector" data-action="anime_pro">' +
+    function start() {
+        Lampa.Component.add('anime_pro', AnimePlugin);
+        var item = $('<div class="menu__item selector" data-action="anime_pro">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
             '<div class="menu__text">Аниме Pro</div>' +
         '</div>');
-
-        menu_item.on('hover:enter', function () {
-            Lampa.Activity.push({
-                title: 'Аниме Pro',
-                component: 'anime_pro',
-                page: 1
-            });
+        item.on('hover:enter', function () {
+            Lampa.Activity.push({title: 'Аниме Pro', component: 'anime_pro'});
         });
-
-        $('.menu .menu__list').append(menu_item);
+        $('.menu .menu__list').append(item);
     }
 
-    if (window.appready) startPlugin();
-    else Lampa.Listener.follow('app', function (e) {
-        if (e.type == 'ready') startPlugin();
-    });
-})();(function () {
-    'use strict';
-
-    function AnimePro(object) {
-        var network = new Lampa.Reguest();
-        var scroll  = new Lampa.Scroll({mask:true, over:true});
-        var items   = [];
-        var html    = $('<div></div>');
-        var body    = $('<div class="category-full"></div>');
-        var active  = 0;
-        var page    = 1;
-
-        var tabs = [
-            { title: 'Топ аниме', params: 'order=ranked&limit=40' },
-            { title: 'Онгоинги', params: 'status=ongoing&order=popularity&limit=40' },
-            { title: 'Сейчас смотрят', params: 'season=2024_2025&order=popularity&limit=40' },
-            { title: 'Все аниме', params: 'order=popularity&limit=40' },
-            { title: '18+', params: 'rating=rx,r_plus&censored=false&order=popularity&limit=40' }
-        ];
-
-        this.create = function () {
-            var _this = this;
-
-            // Создаем табы
-            var bar   = $('<div class="layer--tabs"></div>');
-            var list  = $('<div class="layer--tabs_list"></div>');
-
-            tabs.forEach(function (tab, i) {
-                var item = $('<div class="layer--tabs_item selector '+(active == i ? 'active' : '')+'" data-index="'+i+'">'+tab.title+'</div>');
-                item.on('hover:enter', function () {
-                    if (active == i) return;
-                    active = i;
-                    page = 1;
-                    $('.layer--tabs_item', list).removeClass('active');
-                    $(this).addClass('active');
-                    _this.load();
-                });
-                list.append(item);
-            });
-
-            html.append(bar);
-            html.append(scroll.render());
-            scroll.append(body);
-
-            this.load();
-
-            return this.render();
-        };
-
-        this.load = function (append) {
-            var _this = this;
-            if(!append) {
-                body.empty();
-                scroll.reset();
-                Lampa.Loading.start();
-            }
-
-            var query = tabs[active].params + '&page=' + page + '&censored=false'; 
-            var url = Lampa.Utils.proxy('https://shikimori.one/api/animes?' + query);
-
-            network.silent(url, function (json) {
-                Lampa.Loading.stop();
-                if(json && json.length){
-                    _this.build(json);
-                } else if(!append) {
-                    body.append('<div class="empty">Ничего не найдено</div>');
-                }
-            }, function(){
-                Lampa.Loading.stop();
-                if(!append) body.append('<div class="empty">Ошибка загрузки</div>');
-            });
-        };
-
-        this.build = function (data) {
-            var _this = this;
-            data.forEach(function(item){
-                var img = item.image ? (item.image.original.indexOf('http') == -1 ? 'https://shikimori.one' + item.image.original : item.image.original) : '';
-                
-                var card = new Lampa.Card({
-                    id: item.id,
-                    title: item.russian || item.name,
-                    img: img,
-                    year: item.aired_on ? item.aired_on.split('-')[0] : '????'
-                }, {
-                    card_source: 'shikimori'
-                });
-
-                card.on('enter', function(){
-                    Lampa.Activity.push({
-                        url: '',
-                        component: 'full',
-                        id: item.id,
-                        method: 'anime',
-                        card: card.object,
-                        source: 'shikimori'
-                    });
-                });
-
-                card.create();
-                body.append(card.render());
-            });
-
-            Lampa.Controller.enable('content');
-        };
-
-        this.render = function () {
-            return html;
-        };
-
-        this.destroy = function () {
-            network.clear();
-            scroll.destroy();
-            html.remove();
-        };
-    }
-
-    function startPlugin() {
-        window.plugin_anime_pro_ready = true;
-        Lampa.Component.add('anime_pro', AnimePro);
-        
-        var menu_item = $('<div class="menu__item selector" data-action="anime_pro">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
-            '<div class="menu__text">Аниме Pro</div>' +
-        '</div>');
-
-        menu_item.on('hover:enter', function () {
-            Lampa.Activity.push({
-                title: 'Аниме Pro',
-                component: 'anime_pro',
-                page: 1
-            });
-        });
-
-        $('.menu .menu__list').append(menu_item);
-    }
-
-    if (window.appready) startPlugin();
-    else Lampa.Listener.follow('app', function (e) {
-        if (e.type == 'ready') startPlugin();
-    });
+    if (window.appready) start();
+    else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') start(); });
 })();
