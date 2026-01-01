@@ -42,20 +42,31 @@
             Lampa.Loading.start();
             body.empty();
 
-            // Прямая ссылка на API Shikimori
             var api_url = 'https://shikimori.one/api/animes?limit=50&' + tabs[active_tab].params;
             
-            // Используем системный метод Lampa для обхода CORS
-            network.silent(Lampa.Utils.proxy(api_url), function (json) {
+            // Пытаемся вызвать прокси безопасно (проверяем наличие функции)
+            var final_url = api_url;
+            if (window.Lampa && Lampa.Utils && typeof Lampa.Utils.proxy === 'function') {
+                final_url = Lampa.Utils.proxy(api_url);
+            }
+
+            network.silent(final_url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.length) {
                     _this.build(json);
                 } else {
-                    body.append('<div class="empty" style="padding:40px;text-align:center;">Данные не получены. Попробуйте сменить прокси в настройках Lampa.</div>');
+                    body.append('<div class="empty">Список пуст</div>');
                 }
             }, function () {
-                Lampa.Loading.stop();
-                body.append('<div class="empty" style="padding:40px;text-align:center;">Ошибка подключения к API</div>');
+                // Если не сработало, пробуем через публичный CORS-прокси (для ПК)
+                var backup_url = 'https://corsproxy.io/?' + encodeURIComponent(api_url);
+                network.silent(backup_url, function(json) {
+                    Lampa.Loading.stop();
+                    if (json && json.length) _this.build(json);
+                }, function() {
+                    Lampa.Loading.stop();
+                    body.append('<div class="empty">Ошибка доступа к API. Проверьте сеть.</div>');
+                });
             });
         };
 
@@ -89,13 +100,13 @@
     }
 
     function start() {
-        Lampa.Component.add('anime_fix', AnimePlugin);
-        var item = $('<div class="menu__item selector" data-action="anime_fix">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v12M6 12h12"></path></svg></div>' +
-            '<div class="menu__text">Аниме Fix</div>' +
+        Lampa.Component.add('anime_final', AnimePlugin);
+        var item = $('<div class="menu__item selector" data-action="anime_final">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg></div>' +
+            '<div class="menu__text">Аниме</div>' +
         '</div>');
         item.on('hover:enter', function () {
-            Lampa.Activity.push({title: 'Аниме Fix', component: 'anime_fix'});
+            Lampa.Activity.push({title: 'Аниме', component: 'anime_final'});
         });
         $('.menu .menu__list').append(item);
     }
