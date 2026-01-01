@@ -4,7 +4,7 @@
     function AnimePlugin(object) {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var html    = $('<div class="anime-pro-v12"></div>');
+        var html    = $('<div class="anime-pro-v13"></div>');
         var body    = $('<div class="category-full"></div>');
         var active_tab = 0;
 
@@ -17,10 +17,10 @@
 
         if (!$('#anime-pro-style').length) {
             $('head').append('<style id="anime-pro-style">' +
-                '.anime-pro-v12 .layer--tabs { margin-bottom: 10px; height: 3.5em; position: relative; z-index: 10; }' +
-                '.anime-pro-v12 .category-full { display: flex; flex-wrap: wrap; padding: 10px; align-items: flex-start; }' +
-                '.anime-pro-v12 .card { margin: 10px; width: 140px; cursor: pointer; }' +
-                '.anime-pro-v12 .layer--tabs_item.active { border-bottom: 2px solid #fff; }' +
+                '.anime-pro-v13 .layer--tabs { margin-bottom: 10px; height: 3.5em; position: relative; z-index: 10; }' +
+                '.anime-pro-v13 .category-full { display: flex; flex-wrap: wrap; padding: 10px; align-items: flex-start; }' +
+                '.anime-pro-v13 .card { margin: 10px; width: 140px; cursor: pointer; }' +
+                '.anime-pro-v13 .layer--tabs_item.active { border-bottom: 2px solid #fff; }' +
                 '</style>');
         }
 
@@ -65,11 +65,12 @@
                 }
             }, function () {
                 Lampa.Loading.stop();
-                body.append('<div class="empty">Ошибка сети (API)</div>');
+                body.append('<div class="empty">Ошибка API</div>');
             });
         };
 
         this.build = function(json) {
+            var _this = this;
             json.forEach(function (item) {
                 var card_data = {
                     id: item.id,
@@ -84,8 +85,9 @@
                 
                 var card_element = card.render();
 
+                // Используем системный метод Lampa для открытия, чтобы избежать ошибки .start()
                 card_element.on('click', function() {
-                    // Используем Activity.push с минимальным набором, который Lampa поймет
+                    Lampa.Controller.toggle('content');
                     Lampa.Activity.push({
                         url: '',
                         title: card_data.title,
@@ -99,6 +101,12 @@
 
                 body.append(card_element);
             });
+            
+            Lampa.Controller.add('content', {
+                toggle: function () {},
+                left: function () { Lampa.Controller.toggle('menu'); },
+                up: function () { Lampa.Controller.toggle('head'); }
+            });
             Lampa.Controller.enable('content');
         };
 
@@ -107,18 +115,17 @@
     }
 
     function startPlugin() {
-        Lampa.Component.add('anime_v12', AnimePlugin);
+        Lampa.Component.add('anime_final', AnimePlugin);
         
-        var menu_item = $('<div class="menu__item selector" data-action="anime_v12">' +
+        var menu_item = $('<div class="menu__item selector" data-action="anime_final">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
-            '<div class="menu__text">Аниме Pro</div>' +
+            '<div class="menu__text">Аниме Fix</div>' +
         '</div>');
 
         menu_item.on('click', function () {
             Lampa.Activity.push({
-                title: 'Аниме Pro',
-                component: 'anime_v12',
-                page: 1
+                title: 'Аниме Fix',
+                component: 'anime_final'
             });
         });
 
