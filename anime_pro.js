@@ -4,112 +4,76 @@
     function AnimePro(object) {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask:true, over:true});
-        var items   = [];
         var html    = $('<div></div>');
-        var body    = $('<div class="anime-pro-category"></div>');
-        var info    = $('<div class="anime-pro-info">Источник: Shikimori | Видео: Поиск Lampa</div>');
+        var body    = $('<div class="category-full"></div>');
+        var info    = $('<div class="anime-pro-info" style="padding: 10px; opacity: 0.5; font-size: 0.8em;">Источник: Shikimori | Tizen Optimized</div>');
         var active  = 0;
         var page    = 1;
-        var total_pages = 1;
-        var last_url = '';
 
-        // Настройка вкладок (Структура)
+        // Настройка вкладок
         var tabs = [
-            {
-                title: 'Топ аниме',
-                params: 'order=ranked&limit=40'
-            },
-            {
-                title: 'Онгоинги',
-                params: 'status=ongoing&order=popularity&limit=40'
-            },
-            {
-                title: 'Сейчас смотрят',
-                params: 'season=2024_2025&order=popularity&limit=40' // Актуальные сезоны
-            },
-            {
-                title: 'Все аниме',
-                params: 'order=popularity&limit=40'
-            },
-            {
-                title: '18+ (R/Rx)',
-                // censored=false и rating=rx (хентай) + r_plus (жесткое)
-                params: 'rating=rx,r_plus&censored=false&order=popularity&limit=40'
-            }
+            { title: 'Топ аниме', params: 'order=ranked&limit=40' },
+            { title: 'Онгоинги', params: 'status=ongoing&order=popularity&limit=40' },
+            { title: 'Сейчас смотрят', params: 'season=2024_2025&order=popularity&limit=40' },
+            { title: 'Все аниме', params: 'order=popularity&limit=40' },
+            { title: '18+', params: 'rating=rx,r_plus&censored=false&order=popularity&limit=40' }
         ];
 
         this.create = function () {
             var _this = this;
-
             this.activity.loader = true;
 
-            Lampa.Background.change(null);
-
-            // Создаем верхнее меню с вкладками
-            this.render_tabs();
-            
-            html.append(info);
-            html.append(scroll.render());
-            scroll.append(body);
-
-            // Первая загрузка
-            this.load();
-
-            return this.render();
-        };
-
-        this.render_tabs = function () {
-            var _this = this;
+            // Рендерим табы
             var bar   = $('<div class="layer--tabs"></div>');
             var list  = $('<div class="layer--tabs_list"></div>');
 
             tabs.forEach(function (tab, i) {
                 var item = $('<div class="layer--tabs_item selector '+(active == i ? 'active' : '')+'" data-index="'+i+'">'+tab.title+'</div>');
-                
                 item.on('hover:enter', function () {
                     if (active == i) return;
                     active = i;
-                    page = 1; // Сброс страницы
+                    page = 1;
                     $('.layer--tabs_item', list).removeClass('active');
                     $(this).addClass('active');
                     _this.load();
                 });
-
                 list.append(item);
             });
 
             bar.append(list);
             html.append(bar);
+            html.append(info);
+            html.append(scroll.render());
+            scroll.append(body);
+
+            this.load();
+
+            return this.render();
         };
 
         this.load = function (append) {
             var _this = this;
             
-            // Если это не подгрузка, чистим контент
             if(!append) {
                 body.empty();
                 scroll.reset();
-                Lampa.Loading.start(function(){ _this.load(false) });
+                Lampa.Loading.start();
             }
 
-            // Формируем URL к Shikimori
-            // censored=false обязателен для 18+ контента
-            var base = 'https://shikimori.one/api/animes?';
+            // Формируем запрос к Shikimori через прокси Lampa
             var query = tabs[active].params + '&page=' + page + '&censored=false'; 
-            var url = base + query;
-            last_url = url;
+            var url = Lampa.Utils.proxy('https://shikimori.one/api/animes?' + query);
 
             network.silent(url, function (json) {
+                Lampa.Loading.stop();
                 if(json && json.length){
                     _this.build(json);
-                    Lampa.Loading.stop();
-                } else {
-                    Lampa.Loading.stop();
-                    if(!append) body.append('<div class="empty">Ничего не найдено</div>');
+                } else if(!append) {
+                    body.append('<div class="empty" style="text-align:center; padding: 40px;">Ничего не найдено</div>');
                 }
             }, function(){
                 Lampa.Loading.stop();
-                if(!append) body.append('<div class="empty">Ошибка сети</div>');
+                if(!append) body.append('<div class="empty" style="text-align:center; padding: 40px;">Ошибка загрузки API (Попробуйте прокси в настройках)</div>');
             });
         };
 
@@ -117,19 +81,18 @@
             var _this = this;
 
             data.forEach(function(item){
-                // Адаптация данных Shikimori под Lampa Card
+                // Исправляем ссылки на картинки для Tizen
+                var img_url = item.image ? item.image.original : '';
+                if (img_url && img_url.indexOf('http') === -1) img_url = 'https://shikimori.one' + img_url;
+
                 var card_data = {
                     id: item.id,
-                    // Приоритет русскому названию
-                    title: item.russian || item.name, 
+                    title: item.russian || item.name,
                     original_title: item.name,
-                    // Shikimori отдает относительные пути
-                    img: 'https://shikimori.one' + item.image.original, 
+                    img: img_url,
                     year: item.aired_on ? item.aired_on.split('-')[0] : '????',
                     score: item.score,
-                    // Дополнительные поля для плееров
-                    kp_id: null, // Shikimori не отдает KP ID напрямую, поиск будет по названию
-                    source: 'shikimori' 
+                    is_anime: true
                 };
 
                 var card = new Lampa.Card(card_data, {
@@ -137,27 +100,24 @@
                     object: card_data
                 });
 
-                // ОБРАБОТКА КЛИКА
                 card.on('enter', function(){
-                    // Открываем полное описание
-                    // Lampa сама попробует найти плееры (Kodik/Collaps) по названию (title)
-                    // Если у пользователя установлены плагины для балансеров.
                     Lampa.Activity.push({
                         url: '',
                         component: 'full',
                         id: item.id,
-                        method: 'search', // Метод search заставит лампу искать по названию
+                        method: 'anime',
                         card: card_data,
                         source: 'shikimori'
                     });
                 });
 
+                card.create();
                 body.append(card.render());
             });
 
-            // Бесконечная прокрутка
-            if(data.length === 40) {
-                var more = $('<div class="selector" style="padding: 20px; text-align: center;">Загрузить еще...</div>');
+            // Кнопка "Еще"
+            if(data.length >= 40) {
+                var more = $('<div class="selector" style="width: 100%; padding: 30px; text-align: center;">Показать еще...</div>');
                 more.on('hover:enter', function(){
                     page++;
                     $(this).remove();
@@ -165,6 +125,8 @@
                 });
                 body.append(more);
             }
+
+            Lampa.Controller.enable('content');
         };
 
         this.render = function () {
@@ -175,38 +137,30 @@
             network.clear();
             scroll.destroy();
             html.remove();
-            items = [];
         };
     }
 
-    // Регистрация плагина
     function startPlugin() {
-        window.plugin_anime_pro = true;
-
+        window.plugin_anime_pro_ready = true;
         Lampa.Component.add('anime_pro', AnimePro);
-
+        
         var menu_item = $('<div class="menu__item selector" data-action="anime_pro">' +
-            '<div class="menu__ico">' +
-                // Иконка в стиле аниме (глаз)
-               '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>' +
-            '</div>' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
             '<div class="menu__text">Аниме Pro</div>' +
         '</div>');
 
         menu_item.on('hover:enter', function () {
             Lampa.Activity.push({
-                url: '',
                 title: 'Аниме Pro',
                 component: 'anime_pro',
                 page: 1
             });
         });
 
-        // Добавляем в меню (обычно под Фильмами/Сериалами)
         $('.menu .menu__list').append(menu_item);
     }
 
-    if (!window.plugin_anime_pro) {
+    if (!window.plugin_anime_pro_ready) {
         if (window.appready) startPlugin();
         else Lampa.Listener.follow('app', function (e) {
             if (e.type == 'ready') startPlugin();
