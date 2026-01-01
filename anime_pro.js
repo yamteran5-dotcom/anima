@@ -4,7 +4,7 @@
     function AnimePlugin(object) {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var html    = $('<div class="anime-pro-v11"></div>');
+        var html    = $('<div class="anime-pro-v12"></div>');
         var body    = $('<div class="category-full"></div>');
         var active_tab = 0;
 
@@ -17,9 +17,10 @@
 
         if (!$('#anime-pro-style').length) {
             $('head').append('<style id="anime-pro-style">' +
-                '.anime-pro-v11 .layer--tabs { margin-bottom: 10px; height: 3.5em; }' +
-                '.anime-pro-v11 .category-full { display: flex; flex-wrap: wrap; padding: 10px; }' +
-                '.anime-pro-v11 .card { margin: 10px; width: 140px; cursor: pointer; }' +
+                '.anime-pro-v12 .layer--tabs { margin-bottom: 10px; height: 3.5em; position: relative; z-index: 10; }' +
+                '.anime-pro-v12 .category-full { display: flex; flex-wrap: wrap; padding: 10px; align-items: flex-start; }' +
+                '.anime-pro-v12 .card { margin: 10px; width: 140px; cursor: pointer; }' +
+                '.anime-pro-v12 .layer--tabs_item.active { border-bottom: 2px solid #fff; }' +
                 '</style>');
         }
 
@@ -60,11 +61,11 @@
                 if (json && json.length) {
                     _this.build(json);
                 } else {
-                    body.append('<div class="empty">Ничего не найдено</div>');
+                    body.append('<div class="empty" style="text-align:center;width:100%;padding:40px;">Ничего не найдено</div>');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                body.append('<div class="empty">Ошибка сети</div>');
+                body.append('<div class="empty">Ошибка сети (API)</div>');
             });
         };
 
@@ -84,17 +85,16 @@
                 var card_element = card.render();
 
                 card_element.on('click', function() {
-                    // Используем универсальный метод открытия через поиск карточки
-                    var search_data = {
-                        method: 'anime',
+                    // Используем Activity.push с минимальным набором, который Lampa поймет
+                    Lampa.Activity.push({
                         url: '',
                         title: card_data.title,
+                        component: 'full',
                         id: item.id,
-                        card: card_data
-                    };
-                    
-                    Lampa.Component.add('full', search_data);
-                    Lampa.Activity.push(search_data);
+                        method: 'anime',
+                        card: card_data,
+                        source: 'shikimori'
+                    });
                 });
 
                 body.append(card_element);
@@ -107,9 +107,9 @@
     }
 
     function startPlugin() {
-        Lampa.Component.add('anime_v11', AnimePlugin);
+        Lampa.Component.add('anime_v12', AnimePlugin);
         
-        var menu_item = $('<div class="menu__item selector" data-action="anime_v11">' +
+        var menu_item = $('<div class="menu__item selector" data-action="anime_v12">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
             '<div class="menu__text">Аниме Pro</div>' +
         '</div>');
@@ -117,7 +117,7 @@
         menu_item.on('click', function () {
             Lampa.Activity.push({
                 title: 'Аниме Pro',
-                component: 'anime_v11',
+                component: 'anime_v12',
                 page: 1
             });
         });
