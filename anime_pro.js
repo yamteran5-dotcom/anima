@@ -4,7 +4,7 @@
     function AnimePlugin(object) {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var html    = $('<div class="anime-pro-v10"></div>');
+        var html    = $('<div class="anime-pro-v11"></div>');
         var body    = $('<div class="category-full"></div>');
         var active_tab = 0;
 
@@ -15,12 +15,11 @@
             {title: '18+', params: 'rating=rx,r_plus&censored=false'}
         ];
 
-        // Добавляем стили один раз
         if (!$('#anime-pro-style').length) {
             $('head').append('<style id="anime-pro-style">' +
-                '.anime-pro-v10 .layer--tabs { margin-bottom: 10px; height: 3.5em; }' +
-                '.anime-pro-v10 .category-full { display: flex; flex-wrap: wrap; padding: 10px; }' +
-                '.anime-pro-v10 .card { margin: 10px; width: 140px; cursor: pointer; }' +
+                '.anime-pro-v11 .layer--tabs { margin-bottom: 10px; height: 3.5em; }' +
+                '.anime-pro-v11 .category-full { display: flex; flex-wrap: wrap; padding: 10px; }' +
+                '.anime-pro-v11 .card { margin: 10px; width: 140px; cursor: pointer; }' +
                 '</style>');
         }
 
@@ -76,7 +75,7 @@
                     title: item.russian || item.name,
                     img: 'https://shikimori.one' + item.image.original,
                     year: item.aired_on ? item.aired_on.split('-')[0] : '',
-                    type: 'anime' // Явно указываем тип для Lampa
+                    type: 'anime'
                 };
 
                 var card = new Lampa.Card(card_data, { card_source: 'shikimori' });
@@ -85,16 +84,17 @@
                 var card_element = card.render();
 
                 card_element.on('click', function() {
-                    // Используем максимально простой и совместимый метод открытия
-                    Lampa.Activity.push({
-                        url: '',
-                        component: 'full',
-                        id: item.id,
+                    // Используем универсальный метод открытия через поиск карточки
+                    var search_data = {
                         method: 'anime',
-                        card: card_data,
-                        source: 'shikimori',
-                        title: card_data.title
-                    });
+                        url: '',
+                        title: card_data.title,
+                        id: item.id,
+                        card: card_data
+                    };
+                    
+                    Lampa.Component.add('full', search_data);
+                    Lampa.Activity.push(search_data);
                 });
 
                 body.append(card_element);
@@ -107,10 +107,9 @@
     }
 
     function startPlugin() {
-        // Регистрируем под новым именем, чтобы сбросить все старые ошибки
-        Lampa.Component.add('anime_v10', AnimePlugin);
+        Lampa.Component.add('anime_v11', AnimePlugin);
         
-        var menu_item = $('<div class="menu__item selector" data-action="anime_v10">' +
+        var menu_item = $('<div class="menu__item selector" data-action="anime_v11">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
             '<div class="menu__text">Аниме Pro</div>' +
         '</div>');
@@ -118,7 +117,7 @@
         menu_item.on('click', function () {
             Lampa.Activity.push({
                 title: 'Аниме Pro',
-                component: 'anime_v10',
+                component: 'anime_v11',
                 page: 1
             });
         });
