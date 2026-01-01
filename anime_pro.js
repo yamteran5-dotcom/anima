@@ -1,20 +1,18 @@
 (function () {
     'use strict';
 
-    function AnimeKodikPlugin() {
+    function AnimePlugin() {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
         var html    = $('<div></div>');
         var body    = $('<div class="category-full"></div>');
         var active_tab = 0;
 
-        var token = 'd6ee39461103e3002f5b5b93931903ee'; 
-
         var tabs = [
-            {title: 'Популярное', params: '&types=anime-serial,anime&order=shikimori_rating'},
-            {title: 'Онгоинги', params: '&types=anime-serial&status=ongoing'},
-            {title: 'Новинки', params: '&types=anime-serial,anime&order=year'},
-            {title: '18+', params: '&types=hentai,hentai-serial'}
+            {title: 'Топ', params: 'order=ranked'},
+            {title: 'Онгоинги', params: 'status=ongoing'},
+            {title: 'Новинки', params: 'order=popularity'},
+            {title: '18+', params: 'rating=rx,r_plus&censored=false'}
         ];
 
         this.create = function () {
@@ -25,7 +23,6 @@
                 var t = $('<div class="layer--tabs_item selector">' + tab.title + '</div>');
                 if (i === active_tab) t.addClass('active');
                 t.on('hover:enter', function () {
-                    if (active_tab === i) return;
                     active_tab = i;
                     bar.find('.layer--tabs_item').removeClass('active');
                     $(this).addClass('active');
@@ -45,40 +42,31 @@
             Lampa.Loading.start();
             body.empty();
 
-            // Чистый URL
-            var api_url = 'https://kodikapi.com/list?token=' + token + tabs[active_tab].params + '&limit=50&with_material_data=true';
+            // Прямая ссылка на API Shikimori
+            var api_url = 'https://shikimori.one/api/animes?limit=50&' + tabs[active_tab].params;
             
-            // Используем метод Lampa для работы с сетью, пробуя разные варианты проксирования
+            // Используем системный метод Lampa для обхода CORS
             network.silent(Lampa.Utils.proxy(api_url), function (json) {
                 Lampa.Loading.stop();
-                if (json && json.results && json.results.length) {
-                    _this.build(json.results);
+                if (json && json.length) {
+                    _this.build(json);
                 } else {
-                    body.append('<div class="empty" style="padding:40px;text-align:center;">База пуста или ошибка API</div>');
+                    body.append('<div class="empty" style="padding:40px;text-align:center;">Данные не получены. Попробуйте сменить прокси в настройках Lampa.</div>');
                 }
             }, function () {
-                // Если первый прокси упал, пробуем напрямую (иногда на Tizen это работает лучше)
-                network.silent(api_url, function(json) {
-                    Lampa.Loading.stop();
-                    if (json.results) _this.build(json.results);
-                }, function() {
-                    Lampa.Loading.stop();
-                    body.append('<div class="empty" style="padding:40px;text-align:center;">Блокировка сети. Проверьте настройки прокси в Lampa.</div>');
-                });
+                Lampa.Loading.stop();
+                body.append('<div class="empty" style="padding:40px;text-align:center;">Ошибка подключения к API</div>');
             });
         };
 
-        this.build = function(items) {
-            items.forEach(function (item) {
-                var img = (item.material_data && item.material_data.poster_url) ? item.material_data.poster_url : (item.screenshots ? item.screenshots[0] : '');
-                if (img && img.indexOf('http') === -1) img = 'https:' + img;
-
+        this.build = function(json) {
+            json.forEach(function (item) {
                 var card = new Lampa.Card({
                     id: item.id,
-                    title: item.russian_title || item.title,
-                    img: img,
-                    year: item.year || (item.material_data ? item.material_data.year : '')
-                }, { card_source: 'kodik' });
+                    title: item.russian || item.name,
+                    img: 'https://shikimori.one' + item.image.original,
+                    year: item.aired_on ? item.aired_on.split('-')[0] : ''
+                }, { card_source: 'shikimori' });
 
                 card.on('enter', function () {
                     Lampa.Activity.push({
@@ -86,7 +74,7 @@
                         id: item.id,
                         method: 'anime',
                         card: card.object,
-                        source: 'kodik'
+                        source: 'shikimori'
                     });
                 });
 
@@ -101,13 +89,13 @@
     }
 
     function start() {
-        Lampa.Component.add('anime_kodik', AnimeKodikPlugin);
-        var item = $('<div class="menu__item selector" data-action="anime_kodik">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="1" width="16" height="22" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg></div>' +
-            '<div class="menu__text">Аниме</div>' +
+        Lampa.Component.add('anime_fix', AnimePlugin);
+        var item = $('<div class="menu__item selector" data-action="anime_fix">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v12M6 12h12"></path></svg></div>' +
+            '<div class="menu__text">Аниме Fix</div>' +
         '</div>');
         item.on('hover:enter', function () {
-            Lampa.Activity.push({title: 'Аниме', component: 'anime_kodik'});
+            Lampa.Activity.push({title: 'Аниме Fix', component: 'anime_fix'});
         });
         $('.menu .menu__list').append(item);
     }
