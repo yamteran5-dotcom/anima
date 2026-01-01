@@ -1,10 +1,10 @@
 (function () {
     'use strict';
 
-    function AnimePlugin(object) {
+    function AnimePlugin() {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var html    = $('<div class="anime-pro-v13"></div>');
+        var html    = $('<div class="anime-pro-v14"></div>');
         var body    = $('<div class="category-full"></div>');
         var active_tab = 0;
 
@@ -17,10 +17,16 @@
 
         if (!$('#anime-pro-style').length) {
             $('head').append('<style id="anime-pro-style">' +
-                '.anime-pro-v13 .layer--tabs { margin-bottom: 10px; height: 3.5em; position: relative; z-index: 10; }' +
-                '.anime-pro-v13 .category-full { display: flex; flex-wrap: wrap; padding: 10px; align-items: flex-start; }' +
-                '.anime-pro-v13 .card { margin: 10px; width: 140px; cursor: pointer; }' +
-                '.anime-pro-v13 .layer--tabs_item.active { border-bottom: 2px solid #fff; }' +
+                '.anime-pro-v14 .layer--tabs { margin-bottom: 10px; height: 3.5em; }' +
+                '.anime-pro-v14 .category-full { display: flex; flex-wrap: wrap; padding: 10px; }' +
+                '.anime-pro-v14 .card { margin: 10px; width: 140px; cursor: pointer; }' +
+                '.anime-pro-v14 .card img { border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); }' +
+                '.anime-info-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 1000; padding: 40px; display: flex; }' +
+                '.anime-info-left { width: 300px; margin-right: 40px; }' +
+                '.anime-info-left img { width: 100%; border-radius: 10px; }' +
+                '.anime-info-right { flex: 1; }' +
+                '.anime-info-right h1 { font-size: 2.5em; margin-bottom: 20px; }' +
+                '.anime-info-close { position: absolute; top: 20px; right: 40px; font-size: 2em; cursor: pointer; }' +
                 '</style>');
         }
 
@@ -60,52 +66,56 @@
                 Lampa.Loading.stop();
                 if (json && json.length) {
                     _this.build(json);
-                } else {
-                    body.append('<div class="empty" style="text-align:center;width:100%;padding:40px;">Ничего не найдено</div>');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                body.append('<div class="empty">Ошибка API</div>');
+                body.append('<div class="empty">Ошибка сети</div>');
             });
+        };
+
+        this.showDetails = function(item) {
+            var overlay = $('<div class="anime-info-overlay">' +
+                '<div class="anime-info-close">×</div>' +
+                '<div class="anime-info-left"><img src="https://shikimori.one' + item.image.original + '"></div>' +
+                '<div class="anime-info-right">' +
+                    '<h1>' + (item.russian || item.name) + '</h1>' +
+                    '<p style="font-size: 1.2em; color: #aaa;">Год: ' + (item.aired_on || 'Неизвестно') + ' | Оценка: ' + item.score + '</p>' +
+                    '<div style="margin-top: 30px; background: #e74c3c; padding: 15px 30px; display: inline-block; border-radius: 5px; font-weight: bold; cursor: pointer;" class="start-play">СМОТРЕТЬ</div>' +
+                '</div>' +
+            '</div>');
+
+            overlay.find('.anime-info-close').on('click', function() { overlay.remove(); });
+            
+            overlay.find('.start-play').on('click', function() {
+                // Вызов встроенного поиска видео Lampa по названию
+                Lampa.Api.search({ query: item.russian || item.name }, function(data) {
+                    // Если поиск сработает, откроется плеер или список торрентов
+                });
+                overlay.remove();
+            });
+
+            $('body').append(overlay);
         };
 
         this.build = function(json) {
             var _this = this;
             json.forEach(function (item) {
                 var card_data = {
-                    id: item.id,
                     title: item.russian || item.name,
                     img: 'https://shikimori.one' + item.image.original,
-                    year: item.aired_on ? item.aired_on.split('-')[0] : '',
-                    type: 'anime'
+                    year: item.aired_on ? item.aired_on.split('-')[0] : ''
                 };
 
-                var card = new Lampa.Card(card_data, { card_source: 'shikimori' });
+                var card = new Lampa.Card(card_data);
                 card.create();
-                
                 var card_element = card.render();
+                card_element.addClass('selector');
 
-                // Используем системный метод Lampa для открытия, чтобы избежать ошибки .start()
                 card_element.on('click', function() {
-                    Lampa.Controller.toggle('content');
-                    Lampa.Activity.push({
-                        url: '',
-                        title: card_data.title,
-                        component: 'full',
-                        id: item.id,
-                        method: 'anime',
-                        card: card_data,
-                        source: 'shikimori'
-                    });
+                    _this.showDetails(item);
                 });
 
                 body.append(card_element);
-            });
-            
-            Lampa.Controller.add('content', {
-                toggle: function () {},
-                left: function () { Lampa.Controller.toggle('menu'); },
-                up: function () { Lampa.Controller.toggle('head'); }
             });
             Lampa.Controller.enable('content');
         };
@@ -115,20 +125,15 @@
     }
 
     function startPlugin() {
-        Lampa.Component.add('anime_final', AnimePlugin);
-        
-        var menu_item = $('<div class="menu__item selector" data-action="anime_final">' +
+        Lampa.Component.add('anime_v14', AnimePlugin);
+        var menu_item = $('<div class="menu__item selector" data-action="anime_v14">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
-            '<div class="menu__text">Аниме Fix</div>' +
+            '<div class="menu__text">Аниме v14</div>' +
         '</div>');
 
         menu_item.on('click', function () {
-            Lampa.Activity.push({
-                title: 'Аниме Fix',
-                component: 'anime_final'
-            });
+            Lampa.Activity.push({ title: 'Аниме v14', component: 'anime_v14' });
         });
-
         $('.menu .menu__list').append(menu_item);
     }
 
