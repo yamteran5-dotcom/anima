@@ -4,7 +4,7 @@
     function AnimePlugin() {
         var network = new Lampa.Reguest();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var html    = $('<div class="anime-best"></div>');
+        var html    = $('<div class="anime-pro-container"></div>');
         var body    = $('<div class="category-full"></div>');
         var active_tab = 0;
 
@@ -15,12 +15,12 @@
             {title: '18+', params: 'rating=rx,r_plus&censored=false'}
         ];
 
-        // Внедряем стили для исправления верстки на ПК и ТВ
-        if (!$('#anime-best-styles').length) {
-            $('head').append('<style id="anime-best-styles">' +
-                '.anime-best .layer--tabs { margin-bottom: 20px; position: relative; z-index: 10; }' +
-                '.anime-best .category-full { display: flex; flex-wrap: wrap; gap: 10px; padding: 20px; }' +
-                '.anime-best .card { margin: 5px; vertical-align: top; }' +
+        // Внедряем стили для исправления верстки
+        if (!$('#anime-pro-style').length) {
+            $('head').append('<style id="anime-pro-style">' +
+                '.anime-pro-container .layer--tabs { margin-bottom: 20px; position: relative; z-index: 10; }' +
+                '.anime-pro-container .category-full { display: flex; flex-wrap: wrap; padding: 10px; }' +
+                '.anime-pro-container .card { margin: 10px; width: 150px; cursor: pointer; }' +
                 '</style>');
         }
 
@@ -31,7 +31,7 @@
             tabs.forEach(function (tab, i) {
                 var t = $('<div class="layer--tabs_item selector">' + tab.title + '</div>');
                 if (i === active_tab) t.addClass('active');
-                t.on('hover:enter', function () {
+                t.on('click', function () { // Используем click для надежности
                     if (active_tab === i) return;
                     active_tab = i;
                     bar.find('.layer--tabs_item').removeClass('active');
@@ -55,21 +55,19 @@
 
             var api_url = 'https://shikimori.one/api/animes?limit=50&' + tabs[active_tab].params;
             
-            // Пытаемся использовать системный прокси, если его нет — внешний corsproxy
-            var final_url = (window.Lampa && Lampa.Utils && typeof Lampa.Utils.proxy === 'function') 
-                ? Lampa.Utils.proxy(api_url) 
-                : 'https://corsproxy.io/?' + encodeURIComponent(api_url);
+            // Используем внешний прокси напрямую, так как Lampa.Utils.proxy у вас отсутствует
+            var final_url = 'https://corsproxy.io/?' + encodeURIComponent(api_url);
 
             network.silent(final_url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.length) {
                     _this.build(json);
                 } else {
-                    body.append('<div class="empty" style="padding:40px;text-align:center;">Список пуст. Проверьте настройки прокси.</div>');
+                    body.append('<div class="empty" style="text-align:center;width:100%;padding:40px;">Список пуст или прокси заблокирован</div>');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                body.append('<div class="empty" style="padding:40px;text-align:center;">Ошибка сети.</div>');
+                body.append('<div class="empty" style="text-align:center;width:100%;padding:40px;">Ошибка сети</div>');
             });
         };
 
@@ -82,14 +80,14 @@
                     year: item.aired_on ? item.aired_on.split('-')[0] : ''
                 };
 
-                // Создаем карточку БЕЗ использования .on()
+                // Создаем карточку как простой объект, чтобы избежать ошибки card.on
                 var card = new Lampa.Card(card_data, { card_source: 'shikimori' });
                 card.create();
-
-                var card_html = card.render();
                 
-                // Вешаем событие клика напрямую на элемент через jQuery
-                card_html.on('hover:enter', function() {
+                var card_element = card.render();
+
+                // Вешаем событие через стандартный jQuery on('click'), который есть везде
+                card_element.on('click', function() {
                     Lampa.Activity.push({
                         component: 'full',
                         id: item.id,
@@ -99,7 +97,7 @@
                     });
                 });
 
-                body.append(card_html);
+                body.append(card_element);
             });
             Lampa.Controller.enable('content');
         };
@@ -108,20 +106,24 @@
         this.destroy = function () { network.clear(); scroll.destroy(); html.remove(); };
     }
 
-    function start() {
-        Lampa.Component.add('anime_best', AnimePlugin);
-        var item = $('<div class="menu__item selector" data-action="anime_best">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg></div>' +
-            '<div class="menu__text">Аниме</div>' +
+    function startPlugin() {
+        Lampa.Component.add('anime_pro_v8', AnimePlugin);
+        
+        var menu_item = $('<div class="menu__item selector" data-action="anime_pro_v8">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 8v8M8 12h8"></path></svg></div>' +
+            '<div class="menu__text">Аниме Pro</div>' +
         '</div>');
 
-        item.on('hover:enter', function () {
-            Lampa.Activity.push({title: 'Аниме', component: 'anime_best'});
+        menu_item.on('click', function () {
+            Lampa.Activity.push({
+                title: 'Аниме Pro',
+                component: 'anime_pro_v8'
+            });
         });
 
-        $('.menu .menu__list').append(item);
+        $('.menu .menu__list').append(menu_item);
     }
 
-    if (window.appready) start();
-    else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') start(); });
+    if (window.appready) startPlugin();
+    else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') startPlugin(); });
 })();
