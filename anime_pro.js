@@ -6,8 +6,7 @@
         var scroll;
         var html = $('<div class="anime-standalone-v16" style="width:100%; height:100%; background:#141414;"></div>');
         var container = $('<div class="anime-grid" style="display:flex; flex-wrap:wrap; padding:20px; gap:10px; justify-content: center;"></div>');
-        var active_params = 'order=ranked';
-
+        
         var tabs = [
             {title: 'Топ', params: 'order=ranked'},
             {title: 'Онгоинги', params: 'status=ongoing'},
@@ -17,12 +16,14 @@
         this.create = function () {
             var _this = this;
             
-            // Панель вкладок
+            // Панель вкладок (Tabs)
             var header = $('<div style="height:60px; display:flex; align-items:center; padding:0 30px; border-bottom:1px solid #333; background: #1a1a1a;"></div>');
-            tabs.forEach(function(tab) {
-                var btn = $('<div class="selector" style="margin-right:25px; cursor:pointer; font-weight:bold; font-size:18px; opacity:0.6; transition: 0.2s;">' + tab.title + '</div>');
+            tabs.forEach(function(tab, i) {
+                var btn = $('<div class="selector" style="margin-right:25px; cursor:pointer; font-weight:bold; font-size:16px; opacity:0.6;">' + tab.title + '</div>');
+                if (i === 0) btn.css({'opacity': 1, 'color': '#ff3e3e'});
+                
                 btn.on('click', function() {
-                    header.find('div').css({'opacity': 0.6, 'color': '#fff'});
+                    header.find('.selector').css({'opacity': 0.6, 'color': '#fff'});
                     $(this).css({'opacity': 1, 'color': '#ff3e3e'});
                     _this.load(tab.params);
                 });
@@ -33,7 +34,7 @@
             html.append(header).append(scroll.render());
             scroll.append(container);
 
-            this.load(active_params);
+            this.load(tabs[0].params);
             return html;
         };
 
@@ -42,25 +43,24 @@
             Lampa.Loading.start();
             container.empty();
             
+            // Используем прямой запрос без системного кэша, чтобы избежать "oncomplite is not a function"
             var url = 'https://corsproxy.io/?' + encodeURIComponent('https://shikimori.one/api/animes?limit=50&' + params);
 
-            network.silent(url, function (json) {
+            network.fetch(url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.length) {
                     json.forEach(function (item) {
                         var name = item.russian || item.name;
                         var card = $(
-                            '<div class="selector" style="width:150px; margin:10px; cursor:pointer; transition: transform 0.2s;">' +
-                                '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:8px; height:215px; object-fit:cover; box-shadow: 0 5px 15px rgba(0,0,0,0.4);">' +
-                                '<div style="font-size:13px; margin-top:8px; text-align:center; height:32px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">' + name + '</div>' +
+                            '<div class="selector" style="width:150px; margin:10px; cursor:pointer;">' +
+                                '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:8px; height:215px; object-fit:cover; box-shadow: 0 5px 15px rgba(0,0,0,0.4); border: 2px solid transparent;">' +
+                                '<div style="font-size:13px; margin-top:8px; text-align:center; height:32px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height: 1.2;">' + name + '</div>' +
                             '</div>'
                         );
 
+                        // Клик сразу вызывает глобальный поиск Lampa (самый надежный способ)
                         card.on('click', function() {
-                            // Самый надежный метод: вызываем глобальный поиск по названию
-                            Lampa.Search.open({
-                                query: name
-                            });
+                            Lampa.Search.open({ query: name });
                         });
 
                         container.append(card);
@@ -69,7 +69,7 @@
                 }
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Ошибка загрузки Shikimori');
+                Lampa.Noty.show('Ошибка загрузки данных');
             });
         };
 
@@ -79,14 +79,20 @@
 
     function startPlugin() {
         Lampa.Component.add('anime_v16', AnimePlugin);
+        
         var menu_item = $('<div class="menu__item selector" data-action="anime_v16">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
             '<div class="menu__text">Аниме Плюс</div>' +
         '</div>');
 
         menu_item.on('click', function () {
-            Lampa.Activity.push({ title: 'Аниме Плюс', component: 'anime_v16' });
+            Lampa.Activity.push({
+                title: 'Аниме Плюс',
+                component: 'anime_v16',
+                page: 1
+            });
         });
+
         $('.menu .menu__list').append(menu_item);
     }
 
