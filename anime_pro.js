@@ -1,51 +1,61 @@
-(function(){
+(function () {
     'use strict';
 
-    function AnimeComponent(){
+    function AnimeComponent() {
         var network = new Lampa.Request();
-        var scroll = new Lampa.Scroll({mask:true, over:true});
+        var scroll;
         var html = $('<div class="category-full"></div>');
-        scroll.append(html);
 
-        this.create = function(){
-            Lampa.Loading.start();
+        this.create = function () {
+            scroll = new Lampa.Scroll({mask: true, over: true});
+            scroll.append(html);
             this.load();
             return scroll.render();
         };
 
-        this.load = function(){
+        this.load = function () {
             var _this = this;
-            // Рабочий вызов через Lampa API
-            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc',
-                function(json){
-                    Lampa.Loading.stop();
-                    if(!json || !json.results || !json.results.length){
-                        html.html('<div style="text-align:center; margin-top:50px; color:#fff;">Список пуст</div>');
-                        return;
-                    }
+            Lampa.Loading.start();
+
+            // Формируем запрос через встроенный механизм проксирования CUB/TMDB
+            // Мы не пишем домен, Лампа сама подставит нужный прокси из настроек
+            var path = 'discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+
+            Lampa.Api.proxy(path, function (json) {
+                Lampa.Loading.stop();
+                if (json && json.results && json.results.length) {
                     _this.build(json.results);
-                },
-                function(){
-                    Lampa.Loading.stop();
-                    html.html('<div style="text-align:center; margin-top:50px; color:#fff;">Ошибка сети или блокировка TMDB</div>');
+                } else {
+                    _this.empty('TMDB не вернул данные через прокси.');
                 }
-            );
+            }, function () {
+                Lampa.Loading.stop();
+                _this.empty('Ошибка прокси. Проверьте: Настройки -> TMDB -> Проксирование -> Да.');
+            });
         };
 
-        this.build = function(results){
+        this.build = function (results) {
             html.empty();
-            results.forEach(function(item){
-                if(!item.poster_path) return;
+            results.forEach(function (item) {
+                if (!item.poster_path) return;
 
                 var card = new Lampa.Card({
                     title: item.name || item.original_name,
-                    img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
+                    img: Lampa.Api.img(item.poster_path), // Важно: используем системный метод для картинок
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
 
                 card.create();
-                card.on('click', function(){
-                    Lampa.Search.open({query:item.name || item.original_name});
+                card.on('click', function () {
+                    // Открываем полноценную карточку Lampa
+                    Lampa.Activity.push({
+                        url: '',
+                        title: item.name || item.original_name,
+                        component: 'full',
+                        id: item.id,
+                        method: 'tv',
+                        card: item
+                    });
                 });
 
                 html.append(card.render());
@@ -53,39 +63,37 @@
             Lampa.Controller.enable('content');
         };
 
-        this.render = function(){ return scroll.render(); };
-        this.destroy = function(){ network.clear(); scroll.destroy(); html.remove(); };
+        this.empty = function(msg) {
+            html.html('<div style="text-align:center; margin-top:100px; color:#fff;">' + msg + '</div>');
+        };
+
+        this.render = function () { return scroll.render(); };
+        this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    Lampa.Component.add('anime_final_v47', AnimeComponent);
+    Lampa.Component.add('anime_final_v48', AnimeComponent);
 
-    function injectMenu(){
-        if($('.menu [data-action="anime_final_v47"]').length) return;
-        var menuList = $('.menu .menu__list');
-        if(!menuList.length) return;
-
-        var menuItem = $(`
-            <div class="menu__item selector" data-action="anime_final_v47">
-                <div class="menu__ico">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                    </svg>
+    function inject() {
+        if ($('.menu [data-action="anime_v48"]').length) return;
+        var list = $('.menu .menu__list');
+        if (list.length) {
+            var item = $(`
+                <div class="menu__item selector" data-action="anime_v48">
+                    <div class="menu__ico">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                    </div>
+                    <div class="menu__text">Аниме</div>
                 </div>
-                <div class="menu__text">Аниме</div>
-            </div>
-        `);
-
-        menuItem.on('click', function(){
-            Lampa.Activity.push({title:'Аниме Онлайн', component:'anime_final_v47'});
-        });
-
-        var tv = menuList.find('[data-action="tv"]');
-        if(tv.length) tv.after(menuItem); else menuList.append(menuItem);
+            `);
+            item.on('click', function () {
+                Lampa.Activity.push({ title: 'Аниме Онлайн', component: 'anime_final_v48' });
+            });
+            var tv = list.find('[data-action="tv"]');
+            if (tv.length) tv.after(item); else list.append(item);
+        }
     }
 
-    // Ждём готовности меню
-    Lampa.Listener.follow('menu', function(e){
-        if(e.type==='ready') injectMenu();
-    });
+    // Используем интервал, так как на lampa.mx меню часто перерисовывается
+    setInterval(inject, 2000);
 
 })();
