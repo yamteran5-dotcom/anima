@@ -4,9 +4,9 @@
     function AnimePlugin() {
         var network = new Lampa.Reguest();
         var scroll;
-        var html = $('<div class="anime-standalone-v15" style="width:100%; height:100%; background:#141414; position:relative;"></div>');
-        var container = $('<div class="anime-grid" style="display:flex; flex-wrap:wrap; padding:20px; gap:15px;"></div>');
-        var info_panel = $('<div class="anime-panel" style="display:none; position:absolute; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.95); z-index:100; padding:50px;"></div>');
+        var html = $('<div class="anime-standalone-v16" style="width:100%; height:100%; background:#141414;"></div>');
+        var container = $('<div class="anime-grid" style="display:flex; flex-wrap:wrap; padding:20px; gap:10px; justify-content: center;"></div>');
+        var active_params = 'order=ranked';
 
         var tabs = [
             {title: 'Топ', params: 'order=ranked'},
@@ -17,24 +17,23 @@
         this.create = function () {
             var _this = this;
             
-            // Шапка со вкладками
-            var header = $('<div style="height:50px; display:flex; align-items:center; padding:0 20px; border-bottom:1px solid #333;"></div>');
-            tabs.forEach(function(tab, i) {
-                var btn = $('<div class="selector" style="margin-right:20px; cursor:pointer; font-weight:bold; opacity:0.6;">' + tab.title + '</div>');
+            // Панель вкладок
+            var header = $('<div style="height:60px; display:flex; align-items:center; padding:0 30px; border-bottom:1px solid #333; background: #1a1a1a;"></div>');
+            tabs.forEach(function(tab) {
+                var btn = $('<div class="selector" style="margin-right:25px; cursor:pointer; font-weight:bold; font-size:18px; opacity:0.6; transition: 0.2s;">' + tab.title + '</div>');
                 btn.on('click', function() {
-                    header.find('div').css('opacity', 0.6);
-                    $(this).css('opacity', 1);
+                    header.find('div').css({'opacity': 0.6, 'color': '#fff'});
+                    $(this).css({'opacity': 1, 'color': '#ff3e3e'});
                     _this.load(tab.params);
                 });
-                if(i === 0) btn.css('opacity', 1);
                 header.append(btn);
             });
 
             scroll = new Lampa.Scroll({mask: true, over: true});
-            html.append(header).append(scroll.render()).append(info_panel);
+            html.append(header).append(scroll.render());
             scroll.append(container);
 
-            this.load(tabs[0].params);
+            this.load(active_params);
             return html;
         };
 
@@ -43,49 +42,35 @@
             Lampa.Loading.start();
             container.empty();
             
-            var url = 'https://corsproxy.io/?' + encodeURIComponent('https://shikimori.one/api/animes?limit=40&' + params);
+            var url = 'https://corsproxy.io/?' + encodeURIComponent('https://shikimori.one/api/animes?limit=50&' + params);
 
             network.silent(url, function (json) {
                 Lampa.Loading.stop();
-                json.forEach(function (item) {
-                    var card = $(
-                        '<div class="selector" style="width:160px; cursor:pointer;">' +
-                            '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:10px; height:230px; object-fit:cover; margin-bottom:8px; border: 2px solid transparent;">' +
-                            '<div style="font-size:14px; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + (item.russian || item.name) + '</div>' +
-                        '</div>'
-                    );
+                if (json && json.length) {
+                    json.forEach(function (item) {
+                        var name = item.russian || item.name;
+                        var card = $(
+                            '<div class="selector" style="width:150px; margin:10px; cursor:pointer; transition: transform 0.2s;">' +
+                                '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:8px; height:215px; object-fit:cover; box-shadow: 0 5px 15px rgba(0,0,0,0.4);">' +
+                                '<div style="font-size:13px; margin-top:8px; text-align:center; height:32px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">' + name + '</div>' +
+                            '</div>'
+                        );
 
-                    card.on('click', function() {
-                        _this.showDetails(item);
+                        card.on('click', function() {
+                            // Самый надежный метод: вызываем глобальный поиск по названию
+                            Lampa.Search.open({
+                                query: name
+                            });
+                        });
+
+                        container.append(card);
                     });
-
-                    container.append(card);
-                });
-                Lampa.Controller.enable('content');
+                    Lampa.Controller.enable('content');
+                }
+            }, function () {
+                Lampa.Loading.stop();
+                Lampa.Noty.show('Ошибка загрузки Shikimori');
             });
-        };
-
-        this.showDetails = function(item) {
-            info_panel.empty().fadeIn(300);
-            var content = $(
-                '<div style="display:flex; height:100%;">' +
-                    '<div style="width:300px; margin-right:50px;"><img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:15px; box-shadow: 0 0 30px rgba(0,0,0,0.8);"></div>' +
-                    '<div style="flex:1;">' +
-                        '<div style="font-size:40px; font-weight:bold; margin-bottom:20px;">' + (item.russian || item.name) + '</div>' +
-                        '<div style="font-size:18px; color:#aaa; margin-bottom:30px;">Рейтинг: ' + item.score + ' | Тип: ' + item.kind.toUpperCase() + '</div>' +
-                        '<div class="selector" id="start_watch" style="background:#fff; color:#000; padding:15px 40px; display:inline-block; border-radius:50px; font-weight:bold; cursor:pointer;">Искать и Смотреть</div>' +
-                        '<div class="selector" id="close_panel" style="margin-left:20px; padding:15px; display:inline-block; cursor:pointer; opacity:0.5;">[Закрыть]</div>' +
-                    '</div>' +
-                '</div>'
-            );
-
-            content.find('#close_panel').on('click', function() { info_panel.fadeOut(200); });
-            content.find('#start_watch').on('click', function() {
-                info_panel.hide();
-                Lampa.Api.search({ query: item.russian || item.name }); 
-            });
-
-            info_panel.append(content);
         };
 
         this.render = function () { return html; };
@@ -93,14 +78,14 @@
     }
 
     function startPlugin() {
-        Lampa.Component.add('anime_v15', AnimePlugin);
-        var menu_item = $('<div class="menu__item selector" data-action="anime_v15">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line></svg></div>' +
-            '<div class="menu__text">Аниме v15</div>' +
+        Lampa.Component.add('anime_v16', AnimePlugin);
+        var menu_item = $('<div class="menu__item selector" data-action="anime_v16">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
+            '<div class="menu__text">Аниме Плюс</div>' +
         '</div>');
 
         menu_item.on('click', function () {
-            Lampa.Activity.push({ title: 'Аниме v15', component: 'anime_v15' });
+            Lampa.Activity.push({ title: 'Аниме Плюс', component: 'anime_v16' });
         });
         $('.menu .menu__list').append(menu_item);
     }
