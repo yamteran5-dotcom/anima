@@ -4,7 +4,7 @@
     function AnimePlugin() {
         var network = new Lampa.Reguest();
         var scroll;
-        var html = $('<div class="anime-standalone-v17" style="width:100%; height:100%; background:#141414;"></div>');
+        var html = $('<div class="anime-standalone-v18" style="width:100%; height:100%; background:#141414;"></div>');
         var container = $('<div class="anime-grid" style="display:flex; flex-wrap:wrap; padding:20px; gap:10px; justify-content: center;"></div>');
         
         var tabs = [
@@ -42,8 +42,8 @@
             Lampa.Loading.start();
             container.empty();
             
-            // Добавляем случайный параметр, чтобы обмануть кэш и избежать ошибки oncomplite
-            var url = 'https://corsproxy.io/?' + encodeURIComponent('https://shikimori.one/api/animes?limit=50&' + params + '&cache_stop=' + Math.random());
+            // Используем silent с рандомным ключом, чтобы избежать ошибки oncomplite
+            var url = 'https://corsproxy.io/?' + encodeURIComponent('https://shikimori.one/api/animes?limit=50&' + params + '&v=' + Math.random());
 
             network.silent(url, function (json) {
                 Lampa.Loading.stop();
@@ -51,30 +51,31 @@
                     json.forEach(function (item) {
                         var name = item.russian || item.name;
                         var card = $(
-                            '<div class="selector" style="width:150px; margin:10px; cursor:pointer;">' +
-                                '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:8px; height:215px; object-fit:cover; box-shadow: 0 5px 15px rgba(0,0,0,0.4);">' +
+                            '<div class="selector" style="width:150px; margin:10px; cursor:pointer; transition: 0.2s;">' +
+                                '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:8px; height:215px; object-fit:cover; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">' +
                                 '<div style="font-size:13px; margin-top:8px; text-align:center; height:32px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; line-height: 1.2;">' + name + '</div>' +
                             '</div>'
                         );
 
-                        // Используем самый простой способ вызова поиска, который точно есть в ядре
+                        // Вместо Activity.push используем прямой вызов поиска Lampa
                         card.on('click', function() {
-                            Lampa.Input.edit({
-                                value: name,
-                                free: true,
-                                title: 'Поиск аниме'
-                            }, function (new_value) {
-                                if (new_value) Lampa.Search.open({ query: new_value });
-                            });
+                            Lampa.Controller.toggle('content'); // Фокусируемся на контенте
+                            Lampa.Search.open({ query: name }); // Открываем глобальный поиск
                         });
 
                         container.append(card);
+                    });
+                    // Включаем контроллер, чтобы можно было выбирать карточки пультом или мышкой
+                    Lampa.Controller.add('content', {
+                        toggle: function () {},
+                        left: function () { Lampa.Controller.toggle('menu'); },
+                        up: function () { Lampa.Controller.toggle('head'); }
                     });
                     Lampa.Controller.enable('content');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                container.append('<div style="text-align:center;width:100%;padding:50px;">Ошибка загрузки API. Попробуйте сменить вкладку.</div>');
+                Lampa.Noty.show('Ошибка загрузки API');
             });
         };
 
@@ -83,9 +84,9 @@
     }
 
     function startPlugin() {
-        Lampa.Component.add('anime_v17', AnimePlugin);
+        Lampa.Component.add('anime_final', AnimePlugin);
         
-        var menu_item = $('<div class="menu__item selector" data-action="anime_v17">' +
+        var menu_item = $('<div class="menu__item selector" data-action="anime_final">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
             '<div class="menu__text">Аниме Fix</div>' +
         '</div>');
@@ -93,7 +94,7 @@
         menu_item.on('click', function () {
             Lampa.Activity.push({
                 title: 'Аниме Fix',
-                component: 'anime_v17'
+                component: 'anime_final'
             });
         });
 
