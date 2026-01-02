@@ -1,61 +1,65 @@
-(function () {
+(function() {
     'use strict';
 
-    // 1️⃣ Компонент каталога
     function AnimeComponent() {
         var network = new Lampa.Request();
         var scroll;
         var html = $('<div class="category-full"></div>');
 
-        this.create = function () {
+        this.create = function() {
             scroll = new Lampa.Scroll({mask:true, over:true});
             scroll.append(html);
+            Lampa.Loading.start(); // показываем сразу
             this.load();
             return scroll.render();
         };
 
-        this.load = function () {
+        this.load = function() {
             var _this = this;
-            Lampa.Loading.start();
-            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU', function (json) {
+
+            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function(json){
                 Lampa.Loading.stop();
-                if (json && json.results) _this.build(json.results);
-                else Lampa.Noty.show('Список пуст');
-            }, function () {
+                if(!json || !json.results || !json.results.length){
+                    html.html('<div style="color:#fff; text-align:center; margin-top:50px;">Список пуст</div>');
+                    return;
+                }
+                _this.build(json.results);
+            }, function(){
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Ошибка сети');
+                html.html('<div style="color:#fff; text-align:center; margin-top:50px;">Ошибка сети</div>');
             });
         };
 
-        this.build = function (results) {
+        this.build = function(results){
             html.empty();
-            results.forEach(function (item) {
-                if (!item.poster_path) return;
+            results.forEach(function(item){
+                if(!item.poster_path) return;
+
                 var card = new Lampa.Card({
                     title: item.name || item.original_name,
                     img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
+
                 card.create();
-                card.on('click', function () {
-                    Lampa.Search.open({ query: item.name || item.original_name });
+                card.on('click', function(){
+                    Lampa.Search.open({query:item.name || item.original_name});
                 });
+
                 html.append(card.render());
             });
             Lampa.Controller.enable('content');
         };
 
-        this.render = function () { return scroll ? scroll.render() : ''; };
-        this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); html.remove(); };
+        this.render = function(){ return scroll ? scroll.render() : ''; };
+        this.destroy = function(){ network.clear(); if(scroll) scroll.destroy(); html.remove(); };
     }
 
-    // 2️⃣ Регистрация компонента
     Lampa.Component.add('anime_mod_final', AnimeComponent);
 
-    // 3️⃣ Функция вставки меню
-    function injectMenu() {
-        if ($('.menu [data-action="anime_mod_final"]').length) return;
-        if (!$('.menu .menu__list').length) return; // меню ещё не готово
+    function injectMenu(){
+        if($('.menu [data-action="anime_mod_final"]').length) return;
+        if(!$('.menu .menu__list').length) return;
 
         var menu_item = $(`
             <div class="menu__item selector" data-action="anime_mod_final">
@@ -70,24 +74,19 @@
             </div>
         `);
 
-        menu_item.on('click', function () {
-            Lampa.Activity.push({
-                title: 'Аниме Онлайн',
-                component: 'anime_mod_final'
-            });
+        menu_item.on('click', function(){
+            Lampa.Activity.push({title:'Аниме Онлайн', component:'anime_mod_final'});
         });
 
-        // Вставляем после раздела "Сериалы" или в конец
-        if ($('.menu [data-action="tv"]').length) {
+        if($('.menu [data-action="tv"]').length){
             $('.menu [data-action="tv"]').after(menu_item);
         } else {
             $('.menu .menu__list').append(menu_item);
         }
     }
 
-    // 4️⃣ Ждём готовности меню
-    Lampa.Listener.follow('menu', function (e) {
-        if (e.type === 'ready') injectMenu();
+    Lampa.Listener.follow('menu', function(e){
+        if(e.type==='ready') injectMenu();
     });
 
 })();
