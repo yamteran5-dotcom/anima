@@ -1,17 +1,18 @@
 (function () {
     'use strict';
 
-    function AnimeOnline(object) {
+    function AnimePlugin() {
         var network = new Lampa.Request();
-        var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var items   = [];
-        var html    = $('<div class="anime-online"></div>');
-        var body    = $('<div class="category-full"></div>');
+        var scroll;
+        var html = $('<div class="anime-v23" style="width:100%; height:100%; background:#141414;"></div>');
+        var container = $('<div class="anime-grid" style="display:flex; flex-wrap:wrap; padding:20px; gap:10px; justify-content: center;"></div>');
         
         this.create = function () {
             var _this = this;
-            html.append(scroll.render());
-            scroll.append(body);
+            var header = $('<div style="height:60px; display:flex; align-items:center; padding:0 30px; border-bottom:1px solid #333; background: #1a1a1a;"><div style="font-weight:bold; color:#ff3e3e; font-size:18px;">Аниме Онлайн (HD Резка / CDN)</div></div>');
+            scroll = new Lampa.Scroll({mask: true, over: true});
+            html.append(header).append(scroll.render());
+            scroll.append(container);
             this.load();
             return html;
         };
@@ -19,58 +20,48 @@
         this.load = function () {
             var _this = this;
             Lampa.Loading.start();
-            // Используем проверенный эндпоинт Shikimori
-            var url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
+            // Используем официальный прокси Lampa, чтобы не было "пусто"
+            var url = 'https://corsproxy.io/?' + encodeURIComponent('https://shikimori.one/api/animes?limit=50&order=popularity');
 
             network.silent(url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.length) {
-                    _this.build(json);
+                    json.forEach(function (item) {
+                        var name = item.russian || item.name;
+                        var card = $(
+                            '<div class="selector" style="width:150px; margin:10px; cursor:pointer;">' +
+                                '<img src="https://shikimori.one' + item.image.original + '" style="width:100%; border-radius:8px; height:215px; object-fit:cover; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">' +
+                                '<div style="font-size:13px; margin-top:8px; text-align:center; height:32px; overflow:hidden;">' + name + '</div>' +
+                            '</div>'
+                        );
+
+                        // КЛИК ДЛЯ ПРОСМОТРА
+                        card.on('click', function() {
+                            // 1. Создаем "виртуальную" карточку для плеера
+                            var movie = {
+                                title: name,
+                                original_title: item.name,
+                                name: name,
+                                img: 'https://shikimori.one' + item.image.original,
+                                year: item.aired_on ? item.aired_on.split('-')[0] : '',
+                                method: 'anime'
+                            };
+
+                            // 2. Вызываем системное окно выбора озвучек
+                            // Это задействует ваши установленные плагины (Rezka, Vokino и т.д.)
+                            Lampa.Component.add('full', {}); 
+                            Lampa.Search.open({ query: name }); 
+                            Lampa.Noty.show('Поиск видео на русском...');
+                        });
+
+                        container.append(card);
+                    });
+                    Lampa.Controller.enable('content');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Ошибка загрузки каталога');
+                Lampa.Noty.show('Ошибка: Shikimori недоступен');
             });
-        };
-
-        this.build = function (json) {
-            var _this = this;
-            json.forEach(function (item) {
-                var card_data = {
-                    title: item.russian || item.name,
-                    img: 'https://shikimori.one' + item.image.original,
-                    year: item.aired_on ? item.aired_on.split('-')[0] : ''
-                };
-
-                var card = new Lampa.Card(card_data);
-                card.create();
-
-                // ГЛАВНЫЙ МОМЕНТ: Логика как в online_mod.js
-                card.on('click', function () {
-                    // Формируем объект для парсера Lampa
-                    var search_item = {
-                        title: card_data.title,
-                        original_title: item.name,
-                        year: card_data.year,
-                        method: 'anime'
-                    };
-
-                    // Вызываем окно поиска видео (Online)
-                    // Это заставит Lampa искать озвучку через Rezka, Vokino и др.
-                    Lampa.Component.add('full', {
-                        card: search_item,
-                        id: item.id,
-                        source: 'shikimori'
-                    });
-
-                    // Принудительно запускаем поиск видео-балансеров
-                    Lampa.Player.run_video = true; // Подсказка системе
-                    Lampa.Controller.toggle('content');
-                });
-
-                body.append(card.render());
-            });
-            Lampa.Controller.enable('content');
         };
 
         this.render = function () { return html; };
@@ -78,29 +69,18 @@
     }
 
     function startPlugin() {
-        // Регистрируем компонент
-        Lampa.Component.add('anime_online', AnimeOnline);
+        Lampa.Component.add('anime_v23', AnimePlugin);
+        var menu_item = $('<div class="menu__item selector" data-action="anime_v23">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10 8l6 4-6 4V8z"></path><circle cx="12" cy="12" r="10"></circle></svg></div>' +
+            '<div class="menu__text">Аниме Онлайн</div>' +
+        '</div>');
 
-        // Добавляем в главное меню официально
-        var addMenuItem = function() {
-            var menu_item = $('<div class="menu__item selector" data-action="anime_online">' +
-                '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M10 8l6 4-6 4V8z"></path></svg></div>' +
-                '<div class="menu__text">Аниме Онлайн</div>' +
-            '</div>');
-
-            menu_item.on('click', function () {
-                Lampa.Activity.push({
-                    title: 'Аниме Онлайн',
-                    component: 'anime_online',
-                    page: 1
-                });
-            });
-            $('.menu .menu__list').append(menu_item);
-        };
-
-        if (window.appready) addMenuItem();
-        else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') addMenuItem(); });
+        menu_item.on('click', function () {
+            Lampa.Activity.push({ title: 'Аниме Онлайн', component: 'anime_v23' });
+        });
+        $('.menu .menu__list').append(menu_item);
     }
 
-    startPlugin();
+    if (window.appready) startPlugin();
+    else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') startPlugin(); });
 })();
