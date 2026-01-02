@@ -16,92 +16,81 @@
         this.load = function () {
             var _this = this;
             Lampa.Loading.start();
-            // Используем стандартный путь TMDB, который Лампа проксирует сама
-            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function (json) {
+
+            // Параметры для поиска аниме (жанр 16, японский язык)
+            var path = 'discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+
+            // Используем системный метод TMDB. Он сам подставит прокси и API-ключ из настроек Лампы
+            Lampa.TMDB.get(path, {}, function (json) {
                 Lampa.Loading.stop();
-                if (json && json.results) _this.build(json.results);
-                else _this.empty();
+                if (json && json.results && json.results.length) {
+                    _this.build(json.results);
+                } else {
+                    _this.empty('TMDB не вернул результаты. Попробуйте изменить "Источник" в настройках TMDB.');
+                }
             }, function () {
                 Lampa.Loading.stop();
-                _this.empty();
+                _this.empty('Ошибка сети. Проверьте настройки прокси в разделе TMDB.');
             });
         };
 
         this.build = function (results) {
+            var _this = this;
             html.empty();
             results.forEach(function (item) {
                 if (!item.poster_path) return;
+
                 var card = new Lampa.Card({
                     title: item.name || item.original_name,
-                    img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
+                    img: Lampa.TMDB.image(item.poster_path), // Системный метод для картинок
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
+
                 card.create();
                 card.on('click', function () {
-                    Lampa.Search.open({ query: item.name || item.original_name });
+                    Lampa.Activity.push({
+                        url: '',
+                        title: item.name || item.original_name,
+                        component: 'full',
+                        id: item.id,
+                        method: 'tv',
+                        card: item
+                    });
                 });
+
                 html.append(card.render());
             });
             Lampa.Controller.enable('content');
         };
 
-        this.empty = function() {
-            html.html('<div style="text-align:center; margin-top:100px; color:#fff;">Ничего не найдено. Проверьте прокси в настройках TMDB.</div>');
+        this.empty = function(msg) {
+            html.html('<div style="text-align:center; margin-top:100px; color:#fff; padding:20px;">' + msg + '</div>');
         };
 
         this.render = function () { return scroll.render(); };
         this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    // 1. Регистрация компонента
-    Lampa.Component.add('anime_mod', AnimeComponent);
+    Lampa.Component.add('anime_fix', AnimeComponent);
 
-    // 2. Функция создания элемента меню
-    function createBtn() {
-        var btn = $(`
-            <div class="menu__item selector" data-action="anime_mod">
-                <div class="menu__ico">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-                </div>
-                <div class="menu__text">Аниме</div>
-            </div>
-        `);
-        btn.on('click', function () {
-            Lampa.Activity.push({ title: 'Аниме', component: 'anime_mod' });
-        });
-        return btn;
-    }
-
-    // 3. Агрессивная вставка
-    function pluginInit() {
-        if ($('.menu [data-action="anime_mod"]').length) return;
-
-        // Попытка №1: В стандартный список
-        var list = $('.menu__list');
+    function inject() {
+        if ($('.menu [data-action="anime_fix"]').length) return;
+        var list = $('.menu .menu__list, .menu__list');
         if (list.length) {
-            var tv = list.find('[data-action="tv"]');
-            if (tv.length) tv.after(createBtn());
-            else list.append(createBtn());
-        }
-
-        // Попытка №2: Через системный метод, если Lampac его не заблокировал
-        if (Lampa.Menu && Lampa.Menu.add && !window.anime_menu_added) {
-            Lampa.Menu.add({
-                id: 'anime_mod',
-                title: 'Аниме',
-                icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>',
-                onSelect: function() { Lampa.Activity.push({ title: 'Аниме', component: 'anime_mod' }); }
+            var item = $(`
+                <div class="menu__item selector" data-action="anime_fix">
+                    <div class="menu__ico">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+                    </div>
+                    <div class="menu__text">Аниме</div>
+                </div>
+            `);
+            item.on('click', function () {
+                Lampa.Activity.push({ title: 'Аниме Онлайн', component: 'anime_fix' });
             });
-            window.anime_menu_added = true;
+            var tv = list.find('[data-action="tv"]');
+            if (tv.length) tv.after(item); else list.append(item);
         }
     }
-
-    // Запускаем мониторинг (раз в 2 сек), чтобы "возвращать" кнопку, если Lampac её удалил
-    setInterval(pluginInit, 2000);
-
-    // Также вешаем на событие открытия меню (на всякий случай)
-    Lampa.Listener.follow('app', function (e) {
-        if (e.type == 'ready') pluginInit();
-    });
-
+    setInterval(inject, 1000);
 })();
