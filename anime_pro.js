@@ -17,19 +17,24 @@
             var _this = this;
             Lampa.Loading.start();
 
-            // Используем официальный метод запроса, который работает на Tizen и Web
-            var path = 'discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+            // Прямая ссылка с ключом + проксирование через CUB (чтобы обойти CORS)
+            // Это самый надежный путь для lampa.mx
+            var api_key = '4ef0d35509cc14c9ef8952448ca32757';
+            var url = 'https://api.themoviedb.org/3/discover/tv?api_key=' + api_key + '&with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+            
+            // Просим Лампу прогнать этот URL через её прокси
+            var proxied_url = Lampa.TMDB.api(url); 
 
-            Lampa.TMDB.get(path, {}, function (json) {
+            network.silent(proxied_url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results && json.results.length) {
                     _this.build(json.results);
                 } else {
-                    _this.empty('Данные не получены. Проверьте настройки прокси в TMDB.');
+                    _this.empty('TMDB вернул пустой ответ. Попробуйте сменить прокси в настройках.');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                _this.empty('Ошибка сети. Включите прокси в настройках TMDB.');
+                _this.empty('Ошибка сети: Запрос заблокирован. Проверьте Настройки -> TMDB -> Проксирование (должно быть ВКЛ).');
             });
         };
 
@@ -47,7 +52,6 @@
                 card.create();
                 card.on('click', function () {
                     Lampa.Activity.push({
-                        url: '',
                         title: item.name || item.original_name,
                         component: 'full',
                         id: item.id,
@@ -62,26 +66,21 @@
         };
 
         this.empty = function(msg) {
-            html.html('<div style="text-align:center; margin-top:100px; color:#fff;">' + msg + '</div>');
+            html.html('<div style="text-align:center; margin-top:100px; color:#fff; padding: 20px;">' + msg + '</div>');
         };
 
         this.render = function () { return scroll.render(); };
         this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    // 1. Регистрируем компонент сразу
-    Lampa.Component.add('anime_final_v49', AnimeComponent);
+    Lampa.Component.add('anime_v50', AnimeComponent);
 
-    // 2. ФУНКЦИЯ КОНТРОЛЯ МЕНЮ
-    function monitorMenu() {
-        // Проверяем, нет ли уже кнопки
-        if ($('.menu [data-action="anime_v49"]').length > 0) return;
-
-        // Ищем список меню
+    function inject() {
+        if ($('.menu [data-action="anime_v50"]').length > 0) return;
         var list = $('.menu .menu__list, .menu__list');
         if (list.length) {
             var item = $(`
-                <div class="menu__item selector" data-action="anime_v49">
+                <div class="menu__item selector" data-action="anime_v50">
                     <div class="menu__ico">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
@@ -90,19 +89,15 @@
                     <div class="menu__text">Аниме</div>
                 </div>
             `);
-
             item.on('click', function () {
-                Lampa.Activity.push({ title: 'Аниме Онлайн', component: 'anime_final_v49' });
+                Lampa.Activity.push({ title: 'Аниме', component: 'anime_v50' });
             });
-
-            // Вставляем после Сериалов или в конец
             var tv = list.find('[data-action="tv"]');
-            if (tv.length) tv.after(item);
-            else list.append(item);
+            if (tv.length) tv.after(item); else list.append(item);
         }
     }
-
-    // Запускаем мониторинг каждые 1000мс (1 секунда)
-    var timer = setInterval(monitorMenu, 1000);
+    
+    // Мониторим меню каждую секунду
+    setInterval(inject, 1000);
 
 })();
