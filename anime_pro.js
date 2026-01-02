@@ -1,13 +1,14 @@
 (function () {
     'use strict';
 
-    function AnimeOnline(object) {
+    function AnimeMod(object) {
         var network = new Lampa.Request();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
         var items   = [];
         var html    = $('<div class="category-full"></div>');
         
         this.create = function () {
+            var _this = this;
             this.load();
             return scroll.render();
         };
@@ -16,7 +17,7 @@
             var _this = this;
             Lampa.Loading.start();
             
-            // Используем проверенный метод запроса из online_mod
+            // Используем ту же структуру запроса, что и в online_mod
             var url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
 
             network.silent(url, function (json) {
@@ -28,7 +29,7 @@
                 }
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show("Нет ответа от Shikimori");
+                Lampa.Noty.show("Нет ответа от сервера");
             });
         };
 
@@ -37,7 +38,6 @@
             scroll.append(html);
 
             json.forEach(function (item) {
-                // Создаем карточку строго по стандарту Lampa
                 var card = new Lampa.Card({
                     title: item.russian || item.name,
                     img: 'https://shikimori.one' + item.image.original,
@@ -46,18 +46,10 @@
 
                 card.create();
 
-                // При клике вызываем поиск видео через установленные у вас плагины
+                // Использование поиска bwa.to/rc при клике
                 card.on('click', function () {
-                    var search_data = {
-                        title: item.russian || item.name,
-                        original_title: item.name,
-                        year: item.aired_on ? item.aired_on.split('-')[0] : '',
-                        type: 'anime'
-                    };
-
-                    // Открываем поиск, который подхватит ваш bwa.to/rc
                     Lampa.Search.open({
-                        query: search_data.title
+                        query: item.russian || item.name
                     });
                 });
 
@@ -67,20 +59,13 @@
             Lampa.Controller.enable('content');
         };
 
-        this.render = function () {
-            return scroll.render();
-        };
-
-        this.destroy = function () {
-            network.clear();
-            scroll.destroy();
-            html.remove();
-        };
+        this.render = function () { return scroll.render(); };
+        this.destroy = function () { network.clear(); scroll.destroy(); html.remove(); };
     }
 
-    // Регистрация в меню
+    // Регистрация в меню (в стиле оригинального online_mod)
     function startPlugin() {
-        Lampa.Component.add('anime_mod', AnimeOnline);
+        Lampa.Component.add('anime_mod', AnimeMod);
 
         var menu_item = $('<div class="menu__item selector" data-action="anime_mod">' +
             '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
