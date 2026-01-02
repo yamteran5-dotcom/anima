@@ -1,6 +1,7 @@
 (function () {
     'use strict';
 
+    // 1. Компонент каталога
     function AnimeComponent() {
         var network = new Lampa.Request();
         var scroll;
@@ -16,13 +17,14 @@
 
         this.load = function () {
             var _this = this;
-            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function (json) {
+            var url = 'discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+            network.api(url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results) _this.build(json.results);
-                else html.html('<div style="text-align:center; margin-top:50px;">Список пуст</div>');
+                else html.html('<div class="empty">Список пуст</div>');
             }, function () {
                 Lampa.Loading.stop();
-                html.html('<div style="text-align:center; margin-top:50px;">Ошибка сети</div>');
+                html.html('<div class="empty">Ошибка сети</div>');
             });
         };
 
@@ -47,17 +49,19 @@
         this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    // Регистрируем компонент сразу
-    Lampa.Component.add('anime_final_fix', AnimeComponent);
+    // Регистрация компонента
+    Lampa.Component.add('anime_final_hijack', AnimeComponent);
 
-    // Функция жесткой вставки
-    function inject() {
-        // Проверка: есть ли меню и нет ли уже нашей кнопки
-        var menuList = $('.menu .menu__list');
-        if (menuList.length && !$('.menu [data-action="anime_final_fix"]').length) {
-            
+    // ФУНКЦИЯ ВСТАВКИ (Прямая инъекция в DOM)
+    function injectToMenu() {
+        if ($('.menu [data-action="anime_final_hijack"]').length) return;
+
+        // Находим любой пункт меню, чтобы прицепиться к нему
+        var target = $('.menu [data-action="tv"], .menu [data-action="movie"], .menu__item').first();
+        
+        if (target.length) {
             var menu_item = $(`
-                <div class="menu__item selector" data-action="anime_final_fix">
+                <div class="menu__item selector" data-action="anime_final_hijack">
                     <div class="menu__ico">
                         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
                             <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
@@ -69,27 +73,27 @@
 
             menu_item.on('click', function () {
                 Lampa.Activity.push({
-                    title: 'Аниме',
-                    component: 'anime_final_fix'
+                    title: 'Аниме Онлайн',
+                    component: 'anime_final_hijack'
                 });
+                // Закрываем меню после клика (для мобильных и ТВ)
+                Lampa.Menu.hide ? Lampa.Menu.hide() : $('.menu').removeClass('active');
             });
 
-            // Пытаемся вставить после "Сериалы" (tv) или просто вниз
-            var tv = menuList.find('[data-action="tv"]');
-            if (tv.length) tv.after(menu_item);
-            else menuList.append(menu_item);
-            
-            console.log('Anime Plugin: Injected into DOM');
+            // Вставляем после Сериалов или Фильмов
+            if ($('.menu [data-action="tv"]').length) $('.menu [data-action="tv"]').after(menu_item);
+            else if ($('.menu [data-action="movie"]').length) $('.menu [data-action="movie"]').after(menu_item);
+            else target.parent().append(menu_item);
         }
     }
 
-    // 1. Попытка через стандартный слушатель
-    Lampa.Listener.follow('menu', function (e) {
-        if (e.type == 'ready') inject();
-    });
+    // ГЛАВНЫЙ МЕХАНИЗМ: Слежка за DOM
+    // Каждые 1.5 секунды проверяем, не исчез ли наш пункт (Lampac любит удалять чужое)
+    setInterval(injectToMenu, 1500);
 
-    // 2. Фоновый мониторинг (раз в 1.5 секунды)
-    // Это решит проблему, если Lampac перерисовывает меню динамически
-    setInterval(inject, 1500);
+    // Дополнительный вызов при любом клике по меню
+    $(document).on('click', '.menu__item', function() {
+        setTimeout(injectToMenu, 100);
+    });
 
 })();
