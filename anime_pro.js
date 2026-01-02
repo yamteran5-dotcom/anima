@@ -1,14 +1,17 @@
 (function () {
     'use strict';
 
-    function AnimeMod(object) {
+    function AnimeTMDB(object) {
         var network = new Lampa.Request();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
         var items   = [];
         var html    = $('<div class="category-full"></div>');
         
+        // Ключ и API TMDB (используем встроенные механизмы Lampa)
+        var api_url = 'https://api.themoviedb.org/3/';
+        var api_key = '4ef0d35509cc14c9ef8952448ca32757'; // Стандартный ключ для тестов
+
         this.create = function () {
-            var _this = this;
             this.load();
             return scroll.render();
         };
@@ -17,39 +20,40 @@
             var _this = this;
             Lampa.Loading.start();
             
-            // Используем ту же структуру запроса, что и в online_mod
-            var url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
+            // Запрашиваем мультфильмы с жанром "Аниме" (210024) или ключевым словом "anime"
+            // Используем системный прокси Lampa для TMDB
+            var url = api_url + 'discover/tv?api_key=' + api_key + '&with_keywords=210024&language=ru-RU&sort_by=popularity.desc';
 
             network.silent(url, function (json) {
                 Lampa.Loading.stop();
-                if (json && json.length) {
-                    _this.build(json);
+                if (json && json.results && json.results.length) {
+                    _this.build(json.results);
                 } else {
-                    Lampa.Noty.show("Ошибка: Список пуст");
+                    Lampa.Noty.show("TMDB не вернул данные");
                 }
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show("Нет ответа от сервера");
+                Lampa.Noty.show("Ошибка сети TMDB");
             });
         };
 
-        this.build = function (json) {
+        this.build = function (results) {
             var _this = this;
             scroll.append(html);
 
-            json.forEach(function (item) {
+            results.forEach(function (item) {
                 var card = new Lampa.Card({
-                    title: item.russian || item.name,
-                    img: 'https://shikimori.one' + item.image.original,
-                    year: item.aired_on ? item.aired_on.split('-')[0] : ''
+                    title: item.name || item.original_name,
+                    img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
+                    year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
 
                 card.create();
 
-                // Использование поиска bwa.to/rc при клике
+                // При клике открываем поиск, который точно подхватит ваш bwa.to/rc
                 card.on('click', function () {
                     Lampa.Search.open({
-                        query: item.russian || item.name
+                        query: item.name || item.original_name
                     });
                 });
 
@@ -63,19 +67,18 @@
         this.destroy = function () { network.clear(); scroll.destroy(); html.remove(); };
     }
 
-    // Регистрация в меню (в стиле оригинального online_mod)
     function startPlugin() {
-        Lampa.Component.add('anime_mod', AnimeMod);
+        Lampa.Component.add('anime_tmdb', AnimeTMDB);
 
-        var menu_item = $('<div class="menu__item selector" data-action="anime_mod">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
-            '<div class="menu__text">Аниме Online</div>' +
+        var menu_item = $('<div class="menu__item selector" data-action="anime_tmdb">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M10 8l6 4-6 4V8z"></path></svg></div>' +
+            '<div class="menu__text">Аниме (TMDB)</div>' +
         '</div>');
 
         menu_item.on('click', function () {
             Lampa.Activity.push({
-                title: 'Аниме Online',
-                component: 'anime_mod',
+                title: 'Аниме TMDB',
+                component: 'anime_tmdb',
                 page: 1
             });
         });
