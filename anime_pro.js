@@ -17,21 +17,24 @@
             var _this = this;
             Lampa.Loading.start();
 
-            // Метод Lampac: используем Lampa.TMDB.api для формирования ссылки через прокси
-            // Добавляем API-ключ напрямую, так как в плагинах он иногда теряется
-            var key = '4ef0d35509cc14c9ef8952448ca32757';
-            var url = 'discover/tv?api_key=' + key + '&with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+            // Прямой ключ и путь через прокси CUB (как это делает Online Mod)
+            var key  = '4ef0d35509cc14c9ef8952448ca32757';
+            var base = 'https://api.themoviedb.org/3/';
+            var path = 'discover/tv?api_key=' + key + '&with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc';
+            
+            // Форсируем использование прокси CUB
+            var url  = 'https://cub.watch/proxy/' + base + path;
 
-            network.api(url, function (json) {
+            network.silent(url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results && json.results.length) {
                     _this.build(json.results);
                 } else {
-                    html.html('<div style="text-align:center; margin-top:50px; color:#fff;">Ничего не найдено (TMDB вернул 0 результатов)</div>');
+                    _this.empty('TMDB не вернул данные через прокси CUB');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                html.html('<div style="text-align:center; margin-top:50px; color:#fff;">Ошибка сети или блокировка прокси</div>');
+                _this.empty('Ошибка сети: CUB прокси недоступен');
             });
         };
 
@@ -42,16 +45,13 @@
 
                 var card = new Lampa.Card({
                     title: item.name || item.original_name,
-                    // Используем системную функцию для картинок, чтобы обойти блокировку CORS
-                    img: Lampa.TMDB.image(item.poster_path), 
+                    img: Lampa.TMDB.image(item.poster_path),
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
 
                 card.create();
                 card.on('click', function () {
-                    // Открываем полную карточку Lampac (не поиск)
                     Lampa.Activity.push({
-                        url: '',
                         title: item.name || item.original_name,
                         component: 'full',
                         id: item.id,
@@ -65,36 +65,37 @@
             Lampa.Controller.enable('content');
         };
 
+        this.empty = function(msg) {
+            html.html('<div style="text-align:center; margin-top:100px; color:#fff; padding: 20px;">' + msg + '</div>');
+        };
+
         this.render = function () { return scroll.render(); };
-        this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); html.remove(); };
+        this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    Lampa.Component.add('anime_final_fixed', AnimeComponent);
+    Lampa.Component.add('anime_direct', AnimeComponent);
 
-    function injectMenu() {
-        if ($('.menu [data-action="anime_final_fixed"]').length) return;
-        var list = $('.menu .menu__list');
-        if (!list.length) return;
-
-        var menuItem = $(`
-            <div class="menu__item selector" data-action="anime_final_fixed">
-                <div class="menu__ico">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-                    </svg>
+    function inject() {
+        if ($('.menu [data-action="anime_direct"]').length) return;
+        var list = $('.menu .menu__list, .menu__list');
+        if (list.length) {
+            var item = $(`
+                <div class="menu__item selector" data-action="anime_direct">
+                    <div class="menu__ico">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                    </div>
+                    <div class="menu__text">Аниме</div>
                 </div>
-                <div class="menu__text">Аниме</div>
-            </div>
-        `);
-
-        menuItem.on('click', function () {
-            Lampa.Activity.push({ title: 'Аниме', component: 'anime_final_fixed' });
-        });
-
-        var tv = list.find('[data-action="tv"]');
-        if (tv.length) tv.after(menuItem); else list.append(menuItem);
+            `);
+            item.on('click', function () {
+                Lampa.Activity.push({ title: 'Аниме Онлайн', component: 'anime_direct' });
+            });
+            var tv = list.find('[data-action="tv"]');
+            if (tv.length) tv.after(item); else list.append(item);
+        }
     }
-
-    // Следим за меню постоянно (fix для lampa.mx)
-    setInterval(injectMenu, 1000);
+    
+    setInterval(inject, 500);
 })();
