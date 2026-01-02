@@ -1,13 +1,13 @@
 (function () {
     'use strict';
 
-    function AnimeComponent(object) {
+    function AnimeComponent() {
         var _this = this;
         var scroll;
         var html = $('<div class="category-full"></div>');
         var active_tab = 'popular';
 
-        // Эндпоинты через системный прокси (работает на Tizen и lampa.mx)
+        // Эндпоинты, которые понимает прокси Lampac
         var routes = {
             ongoing: 'discover/tv?with_genres=16&with_original_language=ja&air_date.gte=' + new Date().toISOString().split('T')[0] + '&sort_by=popularity.desc',
             watching: 'tv/trending/day?with_genres=16',
@@ -19,11 +19,11 @@
         this.create = function () {
             scroll = new Lampa.Scroll({mask: true, over: true});
             
-            // Создание блока вкладок
+            // Панель вкладок
             var tabs_html = $('<div class="category-tabs"></div>');
             var tabs = [
                 {title: 'Онгоинги', id: 'ongoing'},
-                {title: 'Тренды', id: 'watching'},
+                {title: 'Сейчас смотрят', id: 'watching'},
                 {title: 'Популярное', id: 'popular'},
                 {title: 'Топ 100', id: 'top100'},
                 {title: '18+', id: 'adult'}
@@ -54,17 +54,17 @@
             Lampa.Loading.start();
             html.empty();
 
-            // Используем Api.get вместо TMDB.get для обхода CORS и ошибок
+            // ИСПОЛЬЗУЕМ Api.get — это лечит ошибки со скриншотов
             Lampa.Api.get(routes[active_tab], {}, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results && json.results.length) {
                     _this.build(json.results);
                 } else {
-                    _this.empty('Данные не получены. Проверьте настройки TMDB.');
+                    _this.empty('Каталог пуст. Проверьте TMDB в настройках.');
                 }
             }, function () {
                 Lampa.Loading.stop();
-                _this.empty('Ошибка сети. Проверьте проксирование в настройках.');
+                _this.empty('Ошибка сети. Lampac не смог проксировать запрос.');
             });
         };
 
@@ -72,7 +72,7 @@
             results.forEach(function (item) {
                 var card = new Lampa.Card({
                     title: item.name || item.original_name,
-                    img: Lampa.Api.img(item.poster_path), // Проксирование картинок
+                    img: Lampa.Api.img(item.poster_path),
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
 
@@ -88,7 +88,6 @@
                 });
                 html.append(card.render());
             });
-            // Позволяет пульту перемещаться по карточкам
             Lampa.Controller.enable('content');
         };
 
@@ -97,20 +96,18 @@
         };
 
         this.render = function () { return scroll.render(); };
-        this.destroy = function () { scroll.destroy(); html.remove(); };
+        this.destroy = function () { if(scroll) scroll.destroy(); };
     }
 
-    // Регистрация компонента
-    Lampa.Component.add('anime_pro_v65', AnimeComponent);
+    Lampa.Component.add('anime_hub_fixed', AnimeComponent);
 
-    // Добавление в меню
     function inject() {
-        if ($('.menu [data-action="anime_pro"]').length) return;
+        if ($('.menu [data-action="anime_hub"]').length) return;
         var list = $('.menu .menu__list');
         if (list.length) {
-            var item = $('<div class="menu__item selector" data-action="anime_pro"><div class="menu__ico">🎌</div><div class="menu__text">Аниме</div></div>');
+            var item = $('<div class="menu__item selector" data-action="anime_hub"><div class="menu__ico">🎌</div><div class="menu__text">Аниме</div></div>');
             item.on('click', function () {
-                Lampa.Activity.push({ title: 'Аниме Каталог', component: 'anime_pro_v65' });
+                Lampa.Activity.push({ title: 'Аниме Хаб', component: 'anime_hub_fixed' });
             });
             var tv = list.find('[data-action="tv"]');
             if (tv.length) tv.after(item); else list.append(item);
