@@ -1,7 +1,6 @@
 (function () {
     'use strict';
 
-    // 1. Описываем сам компонент (каталог аниме)
     function AnimeTMDB() {
         var network = new Lampa.Request();
         var scroll;
@@ -17,7 +16,6 @@
         this.load = function () {
             var _this = this;
             Lampa.Loading.start();
-            // Запрос через встроенный метод API
             network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results) _this.build(json.results);
@@ -48,13 +46,14 @@
         this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    // 2. Функция инициализации
-    function startPlugin() {
-        // Регистрация компонента
-        Lampa.Component.add('anime_tmdb', AnimeTMDB);
+    // Регистрация компонента (всегда выполняется сразу)
+    Lampa.Component.add('anime_tmdb', AnimeTMDB);
 
-        // Регистрация в меню через официальный метод
-        var menu_item = {
+    // Функция вставки в меню
+    function addMenuItem() {
+        if ($('.menu [data-id="anime_tmdb"]').length) return; // Чтобы не дублировать
+
+        var item = {
             id: 'anime_tmdb',
             title: 'Аниме Онлайн',
             icon: '<svg height="36" viewBox="0 0 24 24" width="36" xmlns="http://www.w3.org/2000/svg"><path d="M21 7L9 19L3.5 13.5L4.91 12.09L9 16.17L19.59 5.59L21 7Z" fill="white"/></svg>',
@@ -66,16 +65,18 @@
             }
         };
         
-        // Добавляем пункт в меню
-        Lampa.Menu.add(menu_item);
+        Lampa.Menu.add(item);
     }
 
-    // 3. Правильный запуск без создания "зависаний"
-    if (window.appready) {
-        startPlugin();
-    } else {
-        Lampa.Listener.follow('app', function (e) {
-            if (e.type == 'ready') startPlugin();
-        });
-    }
+    // Слушаем три разных события, чтобы поймать момент готовности
+    Lampa.Listener.follow('app', function (e) {
+        if (e.type == 'ready') addMenuItem();
+    });
+
+    Lampa.Listener.follow('menu', function (e) {
+        if (e.type == 'ready') addMenuItem();
+    });
+
+    // Страховочный запуск, если всё уже загружено
+    if (window.appready) addMenuItem();
 })();
