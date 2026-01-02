@@ -2,16 +2,17 @@
     'use strict';
 
     function AnimePro() {
+
         this.create = function () {
             var html = $('<div class="empty">Загрузка аниме…</div>');
 
-            // Глобальный поиск — его подхватывают bwa.to / rc / Online Mod
+            // Даём Lampa отрисоваться
             setTimeout(function () {
                 Lampa.Search.open({
                     query: 'аниме',
                     type: 'tv'
                 });
-            }, 100);
+            }, 200);
 
             return html;
         };
@@ -22,7 +23,7 @@
     // Регистрируем компонент
     Lampa.Component.add('anime_pro', AnimePro);
 
-    // Добавляем пункт в боковое меню
+    // Вставка в меню
     function inject() {
         if ($('.menu [data-action="anime_pro"]').length) return;
 
@@ -46,7 +47,6 @@
         list.append(item);
     }
 
-    // Lampa часто перерисовывает меню — контролируем
     setInterval(inject, 1000);
 
 })();
