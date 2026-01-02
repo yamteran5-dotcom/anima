@@ -1,43 +1,43 @@
 (function () {
     'use strict';
 
-    function AnimePlugin(object) {
+    function AnimeOnline(object) {
         var network = new Lampa.Request();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
-        var body    = $('<div class="category-full"></div>');
-        var html    = $('<div></div>');
+        var items   = [];
+        var html    = $('<div class="category-full"></div>');
         
         this.create = function () {
-            html.append(scroll.render());
-            scroll.append(body);
             this.load();
-            return html;
+            return scroll.render();
         };
 
         this.load = function () {
             var _this = this;
             Lampa.Loading.start();
             
-            // Используем bwa прокси, если он доступен, или универсальный ретранслятор
-            var base_url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
-            var proxy_url = 'https://corsproxy.io/?' + encodeURIComponent(base_url);
+            // Используем проверенный метод запроса из online_mod
+            var url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
 
-            network.silent(proxy_url, function (json) {
+            network.silent(url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.length) {
                     _this.build(json);
                 } else {
-                    body.append('<div class="empty">Список пуст. Попробуйте включить Прокси в настройках Lampa.</div>');
+                    Lampa.Noty.show("Ошибка: Список пуст");
                 }
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Ошибка доступа. BWA не пропустил запрос.');
+                Lampa.Noty.show("Нет ответа от Shikimori");
             });
         };
 
         this.build = function (json) {
             var _this = this;
+            scroll.append(html);
+
             json.forEach(function (item) {
+                // Создаем карточку строго по стандарту Lampa
                 var card = new Lampa.Card({
                     title: item.russian || item.name,
                     img: 'https://shikimori.one' + item.image.original,
@@ -45,45 +45,59 @@
                 });
 
                 card.create();
-                
-                // Главное: Передача управления в BWA-парсер
+
+                // При клике вызываем поиск видео через установленные у вас плагины
                 card.on('click', function () {
-                    // Мы не открываем пустую карточку, а сразу триггерим поиск видео
+                    var search_data = {
+                        title: item.russian || item.name,
+                        original_title: item.name,
+                        year: item.aired_on ? item.aired_on.split('-')[0] : '',
+                        type: 'anime'
+                    };
+
+                    // Открываем поиск, который подхватит ваш bwa.to/rc
                     Lampa.Search.open({
-                        query: item.russian || item.name
+                        query: search_data.title
                     });
                 });
 
-                body.append(card.render());
+                html.append(card.render());
             });
+
+            Lampa.Controller.enable('content');
         };
 
-        this.render = function () { return html; };
-        this.destroy = function () { network.clear(); scroll.destroy(); html.remove(); };
-    }
-
-    function start() {
-        Lampa.Component.add('anime_bwa', AnimePlugin);
-
-        var addMenuItem = function() {
-            var menu_item = $('<div class="menu__item selector" data-action="anime_bwa">' +
-                '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></div>' +
-                '<div class="menu__text">Аниме (BWA)</div>' +
-            '</div>');
-
-            menu_item.on('click', function () {
-                Lampa.Activity.push({
-                    title: 'Аниме',
-                    component: 'anime_bwa',
-                    page: 1
-                });
-            });
-            $('.menu .menu__list').append(menu_item);
+        this.render = function () {
+            return scroll.render();
         };
 
-        if (window.appready) addMenuItem();
-        else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') addMenuItem(); });
+        this.destroy = function () {
+            network.clear();
+            scroll.destroy();
+            html.remove();
+        };
     }
 
-    start();
+    // Регистрация в меню
+    function startPlugin() {
+        Lampa.Component.add('anime_mod', AnimeOnline);
+
+        var menu_item = $('<div class="menu__item selector" data-action="anime_mod">' +
+            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg></div>' +
+            '<div class="menu__text">Аниме Online</div>' +
+        '</div>');
+
+        menu_item.on('click', function () {
+            Lampa.Activity.push({
+                title: 'Аниме Online',
+                component: 'anime_mod',
+                page: 1
+            });
+        });
+
+        $('.menu .menu__list').append(menu_item);
+    }
+
+    if (window.appready) startPlugin();
+    else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') startPlugin(); });
 })();
