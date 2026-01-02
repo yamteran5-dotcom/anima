@@ -2,14 +2,12 @@
     'use strict';
 
     function AnimePlugin(object) {
-        // Ошибка №1: Используем только стандартные методы
         var network = new Lampa.Request();
         var scroll  = new Lampa.Scroll({mask: true, over: true});
         var body    = $('<div class="category-full"></div>');
         var html    = $('<div></div>');
         
         this.create = function () {
-            var _this = this;
             html.append(scroll.render());
             scroll.append(body);
             this.load();
@@ -20,20 +18,20 @@
             var _this = this;
             Lampa.Loading.start();
             
-            // Прямой запрос к Shikimori. 
-            // Если bwa.to/rc работает, он должен пропускать эти запросы.
-            var url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
+            // Используем bwa прокси, если он доступен, или универсальный ретранслятор
+            var base_url = 'https://shikimori.one/api/animes?limit=50&order=popularity&kind=tv';
+            var proxy_url = 'https://corsproxy.io/?' + encodeURIComponent(base_url);
 
-            network.silent(url, function (json) {
+            network.silent(proxy_url, function (json) {
                 Lampa.Loading.stop();
                 if (json && json.length) {
                     _this.build(json);
                 } else {
-                    Lampa.Noty.show('Список пуст. Проверьте сеть.');
+                    body.append('<div class="empty">Список пуст. Попробуйте включить Прокси в настройках Lampa.</div>');
                 }
-            }, function (a, c) {
+            }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Shikimori заблокировал запрос');
+                Lampa.Noty.show('Ошибка доступа. BWA не пропустил запрос.');
             });
         };
 
@@ -48,8 +46,9 @@
 
                 card.create();
                 
-                // Исправление логики клика: вызываем системный поиск
+                // Главное: Передача управления в BWA-парсер
                 card.on('click', function () {
+                    // Мы не открываем пустую карточку, а сразу триггерим поиск видео
                     Lampa.Search.open({
                         query: item.russian || item.name
                     });
@@ -63,26 +62,28 @@
         this.destroy = function () { network.clear(); scroll.destroy(); html.remove(); };
     }
 
-    // Регистрация плагина через нативный метод Lampa
     function start() {
-        Lampa.Component.add('anime_pro', AnimePlugin);
+        Lampa.Component.add('anime_bwa', AnimePlugin);
 
-        var menu_item = $('<div class="menu__item selector" data-action="anime_pro">' +
-            '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect><path d="M10 8l6 4-6 4V8z"></path></svg></div>' +
-            '<div class="menu__text">Аниме Про</div>' +
-        '</div>');
+        var addMenuItem = function() {
+            var menu_item = $('<div class="menu__item selector" data-action="anime_bwa">' +
+                '<div class="menu__ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg></div>' +
+                '<div class="menu__text">Аниме (BWA)</div>' +
+            '</div>');
 
-        menu_item.on('click', function () {
-            Lampa.Activity.push({
-                title: 'Аниме Про',
-                component: 'anime_pro',
-                page: 1
+            menu_item.on('click', function () {
+                Lampa.Activity.push({
+                    title: 'Аниме',
+                    component: 'anime_bwa',
+                    page: 1
+                });
             });
-        });
+            $('.menu .menu__list').append(menu_item);
+        };
 
-        $('.menu .menu__list').append(menu_item);
+        if (window.appready) addMenuItem();
+        else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') addMenuItem(); });
     }
 
-    if (window.appready) start();
-    else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') start(); });
+    start();
 })();
