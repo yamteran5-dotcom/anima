@@ -1,7 +1,8 @@
 (function () {
     'use strict';
 
-    function AnimeTMDB() {
+    // 1. Создаем компонент
+    function AnimePlugin() {
         var network = new Lampa.Request();
         var scroll;
         var html = $('<div class="category-full"></div>');
@@ -16,12 +17,13 @@
         this.load = function () {
             var _this = this;
             Lampa.Loading.start();
-            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function (json) {
+            // Используем прямой путь — в Lampac это самый надежный метод
+            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU', function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results) _this.build(json.results);
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Ошибка загрузки данных');
+                Lampa.Noty.show('Ошибка сети');
             });
         };
 
@@ -46,37 +48,35 @@
         this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    // Регистрация компонента (всегда выполняется сразу)
-    Lampa.Component.add('anime_tmdb', AnimeTMDB);
+    // 2. Регистрация (Метод, который точно не вешает Lampac)
+    function start() {
+        if (window.anime_installed) return;
+        window.anime_installed = true;
 
-    // Функция вставки в меню
-    function addMenuItem() {
-        if ($('.menu [data-id="anime_tmdb"]').length) return; // Чтобы не дублировать
+        Lampa.Component.add('anime_comp', AnimePlugin);
 
-        var item = {
-            id: 'anime_tmdb',
-            title: 'Аниме Онлайн',
-            icon: '<svg height="36" viewBox="0 0 24 24" width="36" xmlns="http://www.w3.org/2000/svg"><path d="M21 7L9 19L3.5 13.5L4.91 12.09L9 16.17L19.59 5.59L21 7Z" fill="white"/></svg>',
-            onSelect: function () {
-                Lampa.Activity.push({
-                    title: 'Аниме',
-                    component: 'anime_tmdb'
-                });
+        // В Lampac лучше добавлять через проверку наличия меню
+        var add = function() {
+            var menu_item = {
+                id: 'anime_comp',
+                title: 'Аниме Онлайн',
+                icon: '<svg height="36" viewBox="0 0 24 24" width="36" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
+                onSelect: function () {
+                    Lampa.Activity.push({ title: 'Аниме', component: 'anime_comp' });
+                }
+            };
+            
+            if (Lampa.Menu && Lampa.Menu.add) {
+                Lampa.Menu.add(menu_item);
             }
         };
-        
-        Lampa.Menu.add(item);
+
+        // Запуск
+        if (window.appready) add();
+        else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') add(); });
     }
 
-    // Слушаем три разных события, чтобы поймать момент готовности
-    Lampa.Listener.follow('app', function (e) {
-        if (e.type == 'ready') addMenuItem();
-    });
+    // Выполняем сразу, без ожидания
+    start();
 
-    Lampa.Listener.follow('menu', function (e) {
-        if (e.type == 'ready') addMenuItem();
-    });
-
-    // Страховочный запуск, если всё уже загружено
-    if (window.appready) addMenuItem();
 })();
