@@ -19,20 +19,19 @@
             var _this = this;
             Lampa.Loading.start();
 
-            var url = api_url +
-                'discover/tv' +
+            var url = api_url + 'discover/tv' +
                 '?api_key=' + api_key +
-                '&with_keywords=210024' +
+                '&with_genres=16' +
+                '&with_original_language=ja' +
                 '&language=ru-RU' +
                 '&sort_by=popularity.desc';
 
             network.silent(url, function (json) {
                 Lampa.Loading.stop();
-
                 if (json && Array.isArray(json.results) && json.results.length) {
                     _this.build(json.results);
                 } else {
-                    Lampa.Noty.show('TMDB: пустой ответ');
+                    Lampa.Noty.show('TMDB: список пуст');
                 }
             }, function () {
                 Lampa.Loading.stop();
@@ -46,21 +45,26 @@
             results.forEach(function (item) {
                 if (!item.poster_path) return;
 
+                var title = item.name || item.original_name;
+                if (!title) return;
+
                 var card = new Lampa.Card({
-                    title: item.name || item.original_name || 'Без названия',
+                    title: title,
                     img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
 
                 card.create();
 
-                card.on('click', function () {
+                var card_html = card.render();
+
+                card_html.on('click', function () {
                     Lampa.Search.open({
-                        query: item.name || item.original_name
+                        query: title
                     });
                 });
 
-                html.append(card.render());
+                html.append(card_html);
             });
 
             Lampa.Controller.enable('content');
@@ -82,10 +86,11 @@
 
         Lampa.Menu.add({
             id: 'anime_tmdb',
-            title: 'Аниме (TMDB)',
+            title: 'Аниме Онлайн',
+            icon: '<svg height="36" viewBox="0 0 24 24" width="36"><path d="M21 7L9 19L3.5 13.5L4.91 12.09L9 16.17L19.59 5.59L21 7Z" fill="white"/></svg>',
             onSelect: function () {
                 Lampa.Activity.push({
-                    title: 'Аниме TMDB',
+                    title: 'Аниме (TMDB)',
                     component: 'anime_tmdb'
                 });
             }
@@ -96,5 +101,4 @@
     else Lampa.Listener.follow('app', function (e) {
         if (e.type === 'ready') startPlugin();
     });
-
 })();
