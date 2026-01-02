@@ -3,12 +3,19 @@
 
     function AnimeTMDB() {
         var network = new Lampa.Request();
-        var scroll  = new Lampa.Scroll({ mask: true, over: true });
-        var html    = $('<div class="category-full"></div>');
+        var scroll, html;
 
         this.create = function () {
-            scroll.append(html);          // ✅ ОДИН РАЗ
+            html = $('<div class="category-full"></div>');
+            scroll = new Lampa.Scroll({
+                mask: true,
+                over: true,
+                controller: 'content' // 🔥 КЛЮЧ
+            });
+
+            scroll.append(html);
             this.load();
+
             return scroll.render();
         };
 
@@ -24,10 +31,10 @@
 
             network.api(url, function (json) {
                 Lampa.Loading.stop();
-                if (json && Array.isArray(json.results) && json.results.length) {
+                if (json && Array.isArray(json.results)) {
                     _this.build(json.results);
                 } else {
-                    Lampa.Noty.show('Аниме: список пуст');
+                    Lampa.Noty.show('Аниме: пусто');
                 }
             }, function () {
                 Lampa.Loading.stop();
@@ -48,3 +55,47 @@
                     title: title,
                     img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
+                });
+
+                card.create();
+                var el = card.render();
+
+                el.addClass('selector'); // 🔥 ОБЯЗАТЕЛЬНО
+
+                el.on('click', function () {
+                    Lampa.Search.open({ query: title });
+                });
+
+                html.append(el);
+            });
+
+            Lampa.Controller.enable('content'); // 🔥
+        };
+
+        this.destroy = function () {
+            network.clear();
+            scroll.destroy();
+            html.remove();
+        };
+    }
+
+    function startPlugin() {
+        Lampa.Component.add('anime_tmdb', AnimeTMDB);
+
+        Lampa.Menu.add({
+            id: 'anime_tmdb',
+            title: 'Аниме Онлайн',
+            onSelect: function () {
+                Lampa.Activity.push({
+                    title: 'Аниме',
+                    component: 'anime_tmdb'
+                });
+            }
+        });
+    }
+
+    if (window.appready) startPlugin();
+    else Lampa.Listener.follow('app', function (e) {
+        if (e.type === 'ready') startPlugin();
+    });
+})();
