@@ -1,14 +1,14 @@
 (function () {
     'use strict';
 
-    // 1. Сам компонент каталога
+    // 1. Компонент каталога (TMDB Anime)
     function AnimeComponent() {
         var network = new Lampa.Request();
-        var scroll, html;
+        var scroll;
+        var html = $('<div class="category-full"></div>');
 
         this.create = function () {
             scroll = new Lampa.Scroll({mask: true, over: true});
-            html = $('<div class="category-full"></div>');
             scroll.append(html);
             this.load();
             return scroll.render();
@@ -17,13 +17,13 @@
         this.load = function () {
             var _this = this;
             Lampa.Loading.start();
-            // Нативный запрос через API Lampac/TMDB
+            // Используем проверенный путь Lampac
             network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU', function (json) {
                 Lampa.Loading.stop();
                 if (json && json.results) _this.build(json.results);
             }, function () {
                 Lampa.Loading.stop();
-                Lampa.Noty.show('Ошибка загрузки');
+                Lampa.Noty.show('Ошибка сети');
             });
         };
 
@@ -41,37 +41,59 @@
                 });
                 html.append(card.render());
             });
+            Lampa.Controller.enable('content');
         };
 
         this.render = function () { return scroll ? scroll.render() : ''; };
         this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    // 2. Регистрация плагина (Lampac Method)
-    Lampa.Plugins.add('anime_plugin', function() {
-        // Регистрируем компонент внутри плагина
-        Lampa.Component.add('anime_comp', AnimeComponent);
+    // 2. Регистрация компонента
+    Lampa.Component.add('anime_mod_final', AnimeComponent);
 
-        // Функция добавления в меню
-        var add = function() {
-            if ($('.menu [data-id="anime_comp"]').length) return;
+    // 3. Прямая вставка в меню (Метод Online Mod)
+    function injectMenu() {
+        // Проверяем, не добавили ли мы уже кнопку
+        if ($('.menu [data-action="anime_mod_final"]').length > 0) return;
 
-            Lampa.Menu.add({
-                id: 'anime_comp',
+        // Создаем элемент меню вручную
+        var menu_item = $(`
+            <div class="menu__item selector" data-action="anime_mod_final">
+                <div class="menu__ico">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                        <polyline points="2 17 12 22 22 17"></polyline>
+                        <polyline points="2 12 12 17 22 12"></polyline>
+                    </svg>
+                </div>
+                <div class="menu__text">Аниме Онлайн</div>
+            </div>
+        `);
+
+        // Вешаем событие клика
+        menu_item.on('click', function () {
+            Lampa.Activity.push({
                 title: 'Аниме Онлайн',
-                icon: '<svg height="36" viewBox="0 0 24 24" width="36" fill="white"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',
-                onSelect: function () {
-                    Lampa.Activity.push({
-                        title: 'Аниме',
-                        component: 'anime_comp'
-                    });
-                }
+                component: 'anime_mod_final'
             });
-        };
+        });
 
-        // Запускаем только если приложение готово
-        if (window.appready) add();
-        else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') add(); });
+        // Вставляем в список меню после раздела "Сериалы" или просто в конец
+        if ($('.menu [data-action="tv"]').length) {
+            $('.menu [data-action="tv"]').after(menu_item);
+        } else {
+            $('.menu .menu__list').append(menu_item);
+        }
+    }
+
+    // Запускаем проверку меню при старте и при каждом открытии меню
+    Lampa.Listener.follow('app', function (e) {
+        if (e.type == 'ready') {
+            injectMenu();
+            // На всякий случай повторим через секунду, если Lampac перерисовал меню
+            setTimeout(injectMenu, 1000);
+            setTimeout(injectMenu, 3000);
+        }
     });
 
 })();
