@@ -1,4 +1,4 @@
-(function() {
+(function () {
     'use strict';
 
     function AnimeComponent() {
@@ -6,87 +6,90 @@
         var scroll;
         var html = $('<div class="category-full"></div>');
 
-        this.create = function() {
-            scroll = new Lampa.Scroll({mask:true, over:true});
+        this.create = function () {
+            scroll = new Lampa.Scroll({mask: true, over: true});
             scroll.append(html);
-            Lampa.Loading.start(); // показываем сразу
+            Lampa.Loading.start();
             this.load();
             return scroll.render();
         };
 
-        this.load = function() {
+        this.load = function () {
             var _this = this;
-
-            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function(json){
+            network.api('discover/tv?with_genres=16&with_original_language=ja&language=ru-RU&sort_by=popularity.desc', function (json) {
                 Lampa.Loading.stop();
-                if(!json || !json.results || !json.results.length){
-                    html.html('<div style="color:#fff; text-align:center; margin-top:50px;">Список пуст</div>');
-                    return;
-                }
-                _this.build(json.results);
-            }, function(){
+                if (json && json.results) _this.build(json.results);
+                else html.html('<div style="text-align:center; margin-top:50px;">Список пуст</div>');
+            }, function () {
                 Lampa.Loading.stop();
-                html.html('<div style="color:#fff; text-align:center; margin-top:50px;">Ошибка сети</div>');
+                html.html('<div style="text-align:center; margin-top:50px;">Ошибка сети</div>');
             });
         };
 
-        this.build = function(results){
+        this.build = function (results) {
             html.empty();
-            results.forEach(function(item){
-                if(!item.poster_path) return;
-
+            results.forEach(function (item) {
                 var card = new Lampa.Card({
                     title: item.name || item.original_name,
                     img: 'https://image.tmdb.org/t/p/w500' + item.poster_path,
                     year: item.first_air_date ? item.first_air_date.split('-')[0] : ''
                 });
-
                 card.create();
-                card.on('click', function(){
-                    Lampa.Search.open({query:item.name || item.original_name});
+                card.on('click', function () {
+                    Lampa.Search.open({ query: item.name || item.original_name });
                 });
-
                 html.append(card.render());
             });
             Lampa.Controller.enable('content');
         };
 
-        this.render = function(){ return scroll ? scroll.render() : ''; };
-        this.destroy = function(){ network.clear(); if(scroll) scroll.destroy(); html.remove(); };
+        this.render = function () { return scroll ? scroll.render() : ''; };
+        this.destroy = function () { network.clear(); if(scroll) scroll.destroy(); };
     }
 
-    Lampa.Component.add('anime_mod_final', AnimeComponent);
+    // Регистрируем компонент сразу
+    Lampa.Component.add('anime_final_fix', AnimeComponent);
 
-    function injectMenu(){
-        if($('.menu [data-action="anime_mod_final"]').length) return;
-        if(!$('.menu .menu__list').length) return;
-
-        var menu_item = $(`
-            <div class="menu__item selector" data-action="anime_mod_final">
-                <div class="menu__ico">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
-                        <polyline points="2 17 12 22 22 17"></polyline>
-                        <polyline points="2 12 12 17 22 12"></polyline>
-                    </svg>
+    // Функция жесткой вставки
+    function inject() {
+        // Проверка: есть ли меню и нет ли уже нашей кнопки
+        var menuList = $('.menu .menu__list');
+        if (menuList.length && !$('.menu [data-action="anime_final_fix"]').length) {
+            
+            var menu_item = $(`
+                <div class="menu__item selector" data-action="anime_final_fix">
+                    <div class="menu__ico">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
+                        </svg>
+                    </div>
+                    <div class="menu__text">Аниме</div>
                 </div>
-                <div class="menu__text">Аниме Онлайн</div>
-            </div>
-        `);
+            `);
 
-        menu_item.on('click', function(){
-            Lampa.Activity.push({title:'Аниме Онлайн', component:'anime_mod_final'});
-        });
+            menu_item.on('click', function () {
+                Lampa.Activity.push({
+                    title: 'Аниме',
+                    component: 'anime_final_fix'
+                });
+            });
 
-        if($('.menu [data-action="tv"]').length){
-            $('.menu [data-action="tv"]').after(menu_item);
-        } else {
-            $('.menu .menu__list').append(menu_item);
+            // Пытаемся вставить после "Сериалы" (tv) или просто вниз
+            var tv = menuList.find('[data-action="tv"]');
+            if (tv.length) tv.after(menu_item);
+            else menuList.append(menu_item);
+            
+            console.log('Anime Plugin: Injected into DOM');
         }
     }
 
-    Lampa.Listener.follow('menu', function(e){
-        if(e.type==='ready') injectMenu();
+    // 1. Попытка через стандартный слушатель
+    Lampa.Listener.follow('menu', function (e) {
+        if (e.type == 'ready') inject();
     });
+
+    // 2. Фоновый мониторинг (раз в 1.5 секунды)
+    // Это решит проблему, если Lampac перерисовывает меню динамически
+    setInterval(inject, 1500);
 
 })();
